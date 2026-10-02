@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm install -g pnpm@9.15.4 && pnpm install --frozen-lockfile && pnpm --filter @crm/web build
-    startCommand: pnpm --filter @crm/api start
+    buildCommand: export NODE_OPTIONS="--max-old-space-size=1024" && npm install -g pnpm@9.15.4 && pnpm install --frozen-lockfile && pnpm --filter @crm/web build
+    startCommand: cd apps/api && exec node --max-old-space-size=384 --expose-gc --import tsx src/server.ts
     healthCheckPath: /health
     autoDeploy: true
     envVars:

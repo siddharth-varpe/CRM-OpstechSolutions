@@ -12,13 +12,18 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1000,
+    sourcemap: false,
     rollupOptions: {
+      maxParallelFileOps: 2,
       output: {
         manualChunks(id) {
           if (id.includes('invoiceAssets')) {
             return 'invoice-assets';
           }
           if (id.includes('node_modules')) {
+            if (id.includes('echarts')) {
+              return 'vendor-echarts';
+            }
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
             }
