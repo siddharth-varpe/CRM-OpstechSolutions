@@ -5,7 +5,7 @@
     "buildCommand": "pnpm build"
   },
   "deploy": {
-    "startCommand": "cd apps/api && node --max-old-space-size=384 --expose-gc --import tsx src/server.ts",
+    "startCommand": "node --max-old-space-size=384 --expose-gc --import tsx apps/api/src/server.ts",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
