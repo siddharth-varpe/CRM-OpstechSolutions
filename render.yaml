@@ -4,7 +4,7 @@ services:
   # ============================================================
   - type: static
     name: sr-enterprises-admin
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @crm/web build:admin
+    buildCommand: npm install -g pnpm@9.15.4 && pnpm install --frozen-lockfile && pnpm --filter @crm/web build:admin
     staticPublishPath: apps/web/dist/admin
     routes:
       - type: rewrite
@@ -45,7 +45,7 @@ services:
   # ============================================================
   - type: static
     name: sr-enterprises-technician
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @crm/web build:technician
+    buildCommand: npm install -g pnpm@9.15.4 && pnpm install --frozen-lockfile && pnpm --filter @crm/web build:technician
     staticPublishPath: apps/web/dist/technician
     routes:
       - type: rewrite
