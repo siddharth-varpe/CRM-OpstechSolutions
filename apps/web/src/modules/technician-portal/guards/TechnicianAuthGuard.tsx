@@ -78,6 +78,9 @@ export const TechnicianAuthGuard: React.FC<TechnicianAuthGuardProps> = ({ childr
     try {
       await apiClient.post(`${TECHNICIAN_AUTH_API_PREFIX}/logout`, {});
     } finally {
+      try {
+        localStorage.removeItem('crm_session_token');
+      } catch {}
       setTechnician(null);
       setIsAuthenticated(false);
       navigate(TECHNICIAN_AUTH_ROUTE, { replace: true });

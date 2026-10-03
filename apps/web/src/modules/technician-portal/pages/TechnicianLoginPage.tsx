@@ -134,6 +134,9 @@ export const TechnicianLoginPage: React.FC = () => {
       });
 
       if (response && response.data?.sessionToken) {
+        try {
+          localStorage.setItem('crm_session_token', response.data.sessionToken);
+        } catch {}
         const fromPath = (location.state as any)?.from?.pathname || TECHNICIAN_PORTAL_ROUTE_PREFIX;
         navigate(fromPath, { replace: true });
       } else {

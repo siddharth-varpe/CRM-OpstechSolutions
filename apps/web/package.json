@@ -6,7 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node -e \"const fs=require('fs'); if(fs.existsSync('dist')){fs.cpSync('dist','../../dist',{recursive:true});}\"",
+    "dev:admin": "vite --mode admin",
+    "dev:technician": "vite --mode technician",
+    "build": "vite build --mode admin && vite build --mode technician && node -e \"const fs=require('fs'); if(fs.existsSync('dist/admin')){fs.cpSync('dist/admin','dist',{recursive:true}); fs.cpSync('dist/admin','../../dist',{recursive:true});}\"",
+    "build:admin": "vite build --mode admin",
+    "build:technician": "vite build --mode technician",
     "preview": "vite preview",
     "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",

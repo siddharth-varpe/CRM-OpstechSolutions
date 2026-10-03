@@ -111,11 +111,12 @@ export const technicianAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Attach secure HttpOnly session cookie
       const isProduction = env.NODE_ENV === 'production';
+      const sameSiteSetting: 'lax' | 'strict' | 'none' = env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'lax');
       reply.setCookie(TECHNICIAN_AUTH_COOKIE_NAME, result.data.sessionToken, {
         path: '/',
         httpOnly: true,
-        secure: isProduction,
-        sameSite: 'lax',
+        secure: isProduction || sameSiteSetting === 'none',
+        sameSite: sameSiteSetting,
         maxAge: TECHNICIAN_SESSION_TTL_SECONDS,
         expires: new Date(Date.now() + TECHNICIAN_SESSION_TTL_SECONDS * 1000),
       });
@@ -180,11 +181,12 @@ export const technicianAuthRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const isProduction = env.NODE_ENV === 'production';
+    const sameSiteSetting: 'lax' | 'strict' | 'none' = env.COOKIE_SAME_SITE || (isProduction ? 'none' : 'lax');
     reply.clearCookie(TECHNICIAN_AUTH_COOKIE_NAME, {
       path: '/',
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: isProduction || sameSiteSetting === 'none',
+      sameSite: sameSiteSetting,
     });
 
     return reply.status(HTTP_STATUS.OK).send({

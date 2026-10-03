@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B132B" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" id="app-apple-title" content="Technician" />
+    <meta name="application-name" id="app-name-meta" content="Enterprises Technician" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" id="app-apple-icon" href="/apple-touch-icon-technician.png" />
+    <meta name="description" content="Enterprises Technician Portal - Field operations, service tracking & work order management" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Enterprises Technician" />
+    <meta property="og:title" content="Enterprises Technician Portal" />
+    <meta property="og:description" content="Enterprises Technician Portal - Field operations, service tracking & work order management" />
+    <meta property="og:image" content="/pwa-technician-512x512.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="manifest" id="app-manifest" href="/manifest-technician.webmanifest" />
+    <title id="app-title">Enterprises Technician</title>
+
+    <!-- Immediate Application Loading Screen Preload & Styles -->
+    <link rel="preload" as="image" href="/crm-logo.png" type="image/png" />
+    <style>
+      #crm-splash-screen {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        background-color: #00091b;
+        background: radial-gradient(ellipse at 50% 38%, #0a254a 0%, #031429 55%, #000818 100%);
+        z-index: 9999999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        margin: 0;
+        padding: 24px 16px;
+        box-sizing: border-box;
+        transition: opacity 600ms cubic-bezier(0.16, 1, 0.3, 1), visibility 600ms cubic-bezier(0.16, 1, 0.3, 1);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #crm-splash-screen.crm-splash-fade-out {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #crm-splash-screen.crm-splash-hidden {
+        display: none !important;
+      }
+      .crm-splash-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        max-width: 480px;
+        width: 100%;
+        margin-top: -24px;
+      }
+      .crm-splash-logo-wrapper {
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        filter: drop-shadow(0 14px 34px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 24px rgba(14, 165, 233, 0.28));
+      }
+      .crm-splash-logo-img {
+        width: 110px;
+        height: 110px;
+        border-radius: 26px;
+        object-fit: contain;
+        display: block;
+      }
+      .crm-splash-title {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        color: #ffffff;
+        margin-bottom: 6px;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .crm-splash-title-tech {
+        color: #38bdf8;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+      .crm-splash-tagline {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        color: rgba(226, 232, 240, 0.85);
+        margin-bottom: 24px;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      }
+      .crm-splash-loader-bar {
+        width: 260px;
+        max-width: 80vw;
+        height: 5px;
+        background-color: #162a45;
+        border-radius: 9999px;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 16px;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 12px rgba(10, 37, 74, 0.3);
+      }
+      .crm-splash-progress-fill {
+        height: 100%;
+        width: 30%;
+        background: linear-gradient(90deg, #0284c7 0%, #38bdf8 50%, #7dd3fc 100%);
+        border-radius: 9999px;
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+        transition: width 350ms cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+      }
+      .crm-splash-text {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.92);
+        margin-bottom: 4px;
+      }
+      .crm-splash-subtext {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 0.04em;
+        color: rgba(148, 163, 184, 0.82);
+      }
+    </style>
+  </head>
+  <body class="bg-[#F4F6F8] text-slate-900 antialiased selection:bg-primary-600 selection:text-white font-sans">
+    <!-- Immediate Application Loading Screen -->
+    <div id="crm-splash-screen" role="status" aria-live="polite" aria-label="Loading Enterprises Technician">
+      <div class="crm-splash-container">
+        <div class="crm-splash-logo-wrapper">
+          <img
+            id="crm-splash-logo"
+            src="/crm-logo.png"
+            alt="Enterprises Logo"
+            class="crm-splash-logo-img"
+            width="110"
+            height="110"
+            loading="eager"
+            decoding="sync"
+          />
+        </div>
+        <div id="crm-splash-title" class="crm-splash-title">
+          Enterprises <span class="crm-splash-title-tech">Technician</span>
+        </div>
+        <div class="crm-splash-tagline">
+          Field Service &middot; Real-time Ops &middot; Execution
+        </div>
+        <div class="crm-splash-loader-bar" aria-hidden="true">
+          <div id="crm-splash-progress" class="crm-splash-progress-fill"></div>
+        </div>
+        <div class="crm-splash-text">
+          Loading Field Portal...
+        </div>
+        <div class="crm-splash-subtext">
+          Preparing assigned jobs &amp; tracking
+        </div>
+      </div>
+    </div>
+
+    <div id="root"></div>
+    <script type="module" src="/src/technician-main.tsx"></script>
+  </body>
+</html>
