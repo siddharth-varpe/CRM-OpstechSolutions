@@ -136,6 +136,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/sequences', [SettingController::class, 'updateSequences'])->name('settings.sequences.update');
+    Route::get('/settings/clean-data/preview', [SettingController::class, 'cleanDataPreview'])->name('settings.clean_data.preview');
+    Route::post('/settings/clean-data/execute', [SettingController::class, 'executeCleanData'])->name('settings.clean_data.execute');
 });
 
 // Field Technician Mobile Portal Routes

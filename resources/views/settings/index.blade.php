@@ -41,6 +41,13 @@
             <i data-lucide="shield-check" class="w-4 h-4"></i>
             <span>Audit Trail Log</span>
         </a>
+        @if(auth()->user()->isSuperAdmin())
+        <a href="{{ route('settings.index', ['tab' => 'data']) }}"
+           class="px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition {{ $tab === 'data' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-rose-600' }}">
+            <i data-lucide="database" class="w-4 h-4"></i>
+            <span>Data Management</span>
+        </a>
+        @endif
     </div>
 
     <!-- 3. Tab Contents -->
@@ -303,9 +310,207 @@
             @endif
         </div>
     @endif
+
+    @if($tab === 'data')
+        <div class="space-y-6 max-w-4xl">
+            <!-- Data Management Section Card -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shrink-0">
+                        <i data-lucide="database-zap" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-slate-900 text-base mb-1">Data Management</h3>
+                        <p class="text-xs text-slate-500 mb-6">Manage system records lifecycle, database maintenance, and operational resets.</p>
+                        
+                        <div class="p-5 rounded-2xl border border-rose-200/80 bg-rose-50/40 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                        <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-600"></i>
+                                        Clean CRM Data
+                                    </h4>
+                                    <p class="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                                        Permanently remove selected business, transaction, inventory, service, and demonstration records to prepare the CRM for a fresh operational start. Your application, database structure, essential configuration, and protected administrator access will remain intact.
+                                    </p>
+                                </div>
+                                <div class="shrink-0">
+                                    <button type="button" 
+                                            id="btnOpenCleanDataModal" 
+                                            class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        <span>Clean CRM Data</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-2 text-[11px] text-rose-700 font-medium pt-2 border-t border-rose-200/60">
+                                <i data-lucide="info" class="w-3.5 h-3.5 shrink-0"></i>
+                                <span>This operation is irreversible without a backup. Protected administrator access, roles, permissions, settings, and database structure will be preserved.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clean CRM Data Modal (Two-Stage Confirmation) -->
+        <div id="cleanDataModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden transition-all my-8">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                            <i data-lucide="alert-octagon" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">Clean CRM Business Data</h3>
+                            <p class="text-xs text-slate-500">Destructive operational database reset</p>
+                        </div>
+                    </div>
+                    <button type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition" onclick="closeCleanDataModal()">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                    <!-- Loading State -->
+                    <div id="cleanDataLoading" class="py-12 text-center space-y-3">
+                        <i data-lucide="loader-2" class="w-8 h-8 text-rose-600 animate-spin mx-auto"></i>
+                        <p class="text-xs font-semibold text-slate-600">Calculating real-time database impact &amp; record counts...</p>
+                    </div>
+
+                    <!-- Content Container (Shown once preview loaded) -->
+                    <div id="cleanDataContent" class="hidden space-y-5">
+                        <!-- Explicit Warning Box -->
+                        <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs space-y-1.5">
+                            <div class="font-bold flex items-center gap-2 text-amber-800">
+                                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+                                Permanent Deletion Notice
+                            </div>
+                            <p class="text-[11px] text-amber-800/90 leading-relaxed">
+                                This operation permanently deletes the records listed below. It cannot be undone through the CRM interface. Create and verify a backup before proceeding.
+                            </p>
+                        </div>
+
+                        <!-- Stage 1: Deletion Breakdown -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Scheduled for Deletion</h4>
+                                <span id="previewTotalCount" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-mono">0 records</span>
+                            </div>
+                            <div id="previewCategoriesList" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                <!-- Populated dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Protected Entities -->
+                        <div class="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-100 text-xs space-y-2">
+                            <h4 class="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                                Protected &amp; Intact Resources
+                            </h4>
+                            <ul class="text-[11px] text-emerald-800 space-y-1 list-disc list-inside">
+                                <li><strong>Super Admin Access:</strong> Your login credentials and settings privileges remain untouched.</li>
+                                <li><strong>Catalogue &amp; Masters:</strong> Product definitions and spare parts catalog remain intact (stock reset to 0).</li>
+                                <li><strong>Structure &amp; Audit:</strong> Database tables, schema migrations, and audit trails are preserved.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Stage 2: Explicit Confirmation Form -->
+                        <form id="formExecuteCleanData" class="space-y-4 pt-3 border-t border-slate-200">
+                            @csrf
+                            <div>
+                                <label class="block text-xs font-bold text-slate-800 mb-1">
+                                    Type <span class="font-mono text-rose-600 select-all bg-rose-50 px-1 py-0.5 rounded border border-rose-200">DELETE CRM DATA</span> to confirm:
+                                </label>
+                                <input type="text" 
+                                       id="inputConfirmPhrase" 
+                                       name="confirmation_phrase" 
+                                       autocomplete="off" 
+                                       placeholder="Type DELETE CRM DATA" 
+                                       class="form-input text-xs font-mono font-bold tracking-wider">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-800 mb-1">
+                                    Super Administrator Password (Re-authentication):
+                                </label>
+                                <input type="password" 
+                                       id="inputAdminPassword" 
+                                       name="password" 
+                                       autocomplete="current-password" 
+                                       placeholder="Enter your current password" 
+                                       class="form-input text-xs font-semibold">
+                            </div>
+
+                            <div class="flex items-start gap-2.5 pt-1">
+                                <input type="checkbox" 
+                                       id="chkAcknowledge" 
+                                       name="acknowledge_risks" 
+                                       value="1" 
+                                       class="rounded border-slate-300 text-rose-600 focus:ring-rose-500 mt-0.5 cursor-pointer">
+                                <label for="chkAcknowledge" class="text-xs text-slate-700 font-medium leading-snug cursor-pointer">
+                                    I understand that this action will permanently wipe all operational customer, invoice, and transactional records and cannot be undone.
+                                </label>
+                            </div>
+
+                            <!-- Error Alert -->
+                            <div id="cleanDataError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                                <span id="cleanDataErrorText"></span>
+                            </div>
+
+                            <!-- Modal Actions -->
+                            <div class="flex items-center justify-end gap-3 pt-3">
+                                <button type="button" 
+                                        class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer" 
+                                        onclick="closeCleanDataModal()">
+                                    Cancel
+                                </button>
+                                <button type="submit" 
+                                        id="btnConfirmDelete" 
+                                        disabled 
+                                        class="px-5 py-2.5 rounded-xl bg-slate-300 text-slate-500 font-bold text-xs transition flex items-center gap-2 cursor-not-allowed">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    <span id="btnConfirmDeleteText">Permanently Delete CRM Data</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
 
 <script>
+function closeCleanDataModal() {
+    $('#cleanDataModal').addClass('hidden');
+    $('#formExecuteCleanData')[0]?.reset();
+    $('#cleanDataError').addClass('hidden');
+    checkConfirmButtonState();
+}
+
+function checkConfirmButtonState() {
+    const phrase = ($('#inputConfirmPhrase').val() || '').trim();
+    const ack = $('#chkAcknowledge').is(':checked');
+    const pwd = ($('#inputAdminPassword').val() || '').trim();
+
+    const isValid = (phrase === 'DELETE CRM DATA' && ack && pwd.length > 0);
+
+    const $btn = $('#btnConfirmDelete');
+    if (isValid) {
+        $btn.prop('disabled', false)
+            .removeClass('bg-slate-300 text-slate-500 cursor-not-allowed')
+            .addClass('bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-xs');
+    } else {
+        $btn.prop('disabled', true)
+            .removeClass('bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-xs')
+            .addClass('bg-slate-300 text-slate-500 cursor-not-allowed');
+    }
+}
+
 $(document).ready(function() {
     CRM.handleAjaxForm('#formSaveSettings', function(res) {
         CRM.toast(res.message || 'Business profile settings saved successfully!');
@@ -337,6 +542,116 @@ $(document).ready(function() {
 
     $(document).on('input', '.seq-prefix-input, .seq-pad-input', function() {
         updateSamplePreview($(this).closest('tr'));
+    });
+
+    // Clean CRM Data Modal Trigger
+    $('#btnOpenCleanDataModal').on('click', function() {
+        $('#cleanDataModal').removeClass('hidden');
+        $('#cleanDataLoading').removeClass('hidden');
+        $('#cleanDataContent').addClass('hidden');
+        $('#cleanDataError').addClass('hidden');
+        $('#formExecuteCleanData')[0]?.reset();
+        checkConfirmButtonState();
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Fetch real-time server calculated impact preview
+        $.ajax({
+            url: "{{ route('settings.clean_data.preview') }}",
+            type: 'GET',
+            dataType: 'json',
+            success: function(res) {
+                $('#cleanDataLoading').addClass('hidden');
+                $('#cleanDataContent').removeClass('hidden');
+
+                if (res.success && res.preview) {
+                    const p = res.preview;
+                    $('#previewTotalCount').text(`${p.total_records.toLocaleString()} records`);
+
+                    let html = '';
+                    for (const [key, cat] of Object.entries(p.categories)) {
+                        html += `
+                            <div class="p-2.5 rounded-xl border border-slate-200/90 bg-slate-50/60 flex items-center justify-between">
+                                <div class="pr-2">
+                                    <div class="font-semibold text-slate-800 text-[11px]">${cat.label}</div>
+                                    <div class="text-[10px] text-slate-400 line-clamp-1">${cat.description}</div>
+                                </div>
+                                <span class="font-mono font-bold text-xs px-2 py-0.5 rounded ${cat.count > 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-200/70 text-slate-600'}">
+                                    ${cat.count.toLocaleString()}
+                                </span>
+                            </div>
+                        `;
+                    }
+                    $('#previewCategoriesList').html(html);
+                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            },
+            error: function(xhr) {
+                $('#cleanDataLoading').addClass('hidden');
+                $('#cleanDataContent').removeClass('hidden');
+                const err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Unable to calculate preview.';
+                $('#cleanDataErrorText').text(err);
+                $('#cleanDataError').removeClass('hidden');
+            }
+        });
+    });
+
+    // Real-time Confirmation Validation
+    $('#inputConfirmPhrase, #inputAdminPassword').on('input', checkConfirmButtonState);
+    $('#chkAcknowledge').on('change', checkConfirmButtonState);
+
+    // Clean CRM Data Form Submission
+    $('#formExecuteCleanData').on('submit', function(e) {
+        e.preventDefault();
+        $('#cleanDataError').addClass('hidden');
+
+        const $btn = $('#btnConfirmDelete');
+        const $btnText = $('#btnConfirmDeleteText');
+        $btn.prop('disabled', true);
+        $btnText.text('Executing Cleanup...');
+
+        const formData = {
+            _token: $('meta[name="csrf-token"]').attr('content'),
+            confirmation_phrase: $('#inputConfirmPhrase').val(),
+            acknowledge_risks: $('#chkAcknowledge').is(':checked') ? 1 : 0,
+            password: $('#inputAdminPassword').val()
+        };
+
+        $.ajax({
+            url: "{{ route('settings.clean_data.execute') }}",
+            type: 'POST',
+            data: JSON.stringify(formData),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    closeCleanDataModal();
+                    CRM.toast(res.message || 'CRM business data cleaned successfully.');
+                    setTimeout(function() {
+                        window.location.href = "{{ route('settings.index', ['tab' => 'data']) }}";
+                    }, 1200);
+                } else {
+                    $('#cleanDataErrorText').text(res.message || 'Operation failed.');
+                    $('#cleanDataError').removeClass('hidden');
+                    $btn.prop('disabled', false);
+                    $btnText.text('Permanently Delete CRM Data');
+                }
+            },
+            error: function(xhr) {
+                let err = 'An error occurred during database cleanup.';
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.errors && xhr.responseJSON.errors.password) {
+                        err = xhr.responseJSON.errors.password[0];
+                    } else if (xhr.responseJSON.message) {
+                        err = xhr.responseJSON.message;
+                    }
+                }
+                $('#cleanDataErrorText').text(err);
+                $('#cleanDataError').removeClass('hidden');
+                $btn.prop('disabled', false);
+                $btnText.text('Permanently Delete CRM Data');
+            }
+        });
     });
 });
 </script>

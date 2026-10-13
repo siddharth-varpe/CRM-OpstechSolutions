@@ -11,7 +11,11 @@ class SettingController extends Controller
 {
     public function index(Request $request)
     {
-        $tab = $request->get('tab', 'business'); // business, numbering, tax, audit
+        $tab = $request->get('tab', 'business'); // business, numbering, tax, audit, data
+
+        if ($tab === 'data' && (!$request->user() || !$request->user()->isSuperAdmin())) {
+            $tab = 'business';
+        }
 
         $settings = SystemSetting::all()->pluck('value', 'key')->toArray();
 
@@ -123,4 +127,76 @@ class SettingController extends Controller
 
         return redirect()->route('settings.index', ['tab' => 'numbering'])->with('success', 'Document numbering rules updated.');
     }
+
+    /**
+     * Generate real-time server calculated impact preview of CRM business data cleanup.
+     * Restricted to authenticated Super Administrators.
+     */
+    public function cleanDataPreview(Request $request, \App\Services\DataCleanupService $cleanupService)
+    {
+        if (!$request->user() || !$request->user()->isSuperAdmin()) {
+            abort(403, 'Unauthorized. Only Super Administrators can preview CRM data cleanup.');
+        }
+
+        $preview = $cleanupService->getImpactPreview();
+
+        return response()->json([
+            'success' => true,
+            'preview' => $preview,
+        ]);
+    }
+
+    /**
+     * Execute destructive CRM business data cleanup.
+     * Enforces: Super Admin authorization, confirmation phrase, risk acknowledgment, password re-authentication, and concurrency locking.
+     */
+    public function executeCleanData(\App\Http\Requests\CleanDataRequest $request, \App\Services\DataCleanupService $cleanupService)
+    {
+        $user = $request->user();
+
+        // 1. Authorization Gate
+        if (!$user || !$user->isSuperAdmin()) {
+            abort(403, 'Unauthorized. Only Super Administrators can execute CRM data cleanup.');
+        }
+
+        // 2. Sensitive Action Password Re-Authentication
+        if (!\Illuminate\Support\Facades\Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Super Administrator password. Operation rejected.',
+                'errors' => [
+                    'password' => ['The provided password does not match your Super Administrator account credentials.'],
+                ],
+            ], 422);
+        }
+
+        // 3. Concurrency & Replay Guard (Atomic Lock)
+        $lock = \Illuminate\Support\Facades\Cache::lock('crm_data_cleanup_mutex', 60);
+        if (!$lock->get()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Another CRM data cleanup operation is currently executing. Please wait for it to complete.',
+            ], 429);
+        }
+
+        try {
+            $result = $cleanupService->executeCleanup($user);
+
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('CRM Data Cleanup failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while cleaning CRM business records. Database changes were safely rolled back.',
+            ], 500);
+        } finally {
+            $lock->release();
+        }
+    }
 }
+
