@@ -122,13 +122,15 @@ class SaleController extends Controller
             $unitPrice = (float) $validated['unit_price'];
             $discount = (float) ($validated['discount_amount'] ?? 0);
 
-            // Determine optional GST rate
-            $applyGst = true;
+            // Determine optional GST rate (0% by default)
+            $applyGst = false;
             if ($request->has('apply_gst')) {
                 $raw = $request->input('apply_gst');
-                if ($raw === '0' || $raw === 0 || $raw === false || $raw === 'false' || $raw === 'off' || $raw === 'no') {
-                    $applyGst = false;
+                if ($raw === '1' || $raw === 1 || $raw === true || $raw === 'true' || $raw === 'on' || $raw === 'yes') {
+                    $applyGst = true;
                 }
+            } elseif ($request->filled('tax_rate') && (float) $request->input('tax_rate') > 0) {
+                $applyGst = true;
             }
 
             if (!$applyGst) {

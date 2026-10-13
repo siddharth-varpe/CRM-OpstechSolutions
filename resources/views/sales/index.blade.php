@@ -342,12 +342,11 @@
                                name="apply_gst" 
                                id="saleApplyGst" 
                                value="1" 
-                               checked 
                                class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer">
                         <span class="text-xs font-semibold text-slate-800">Apply GST (Tax)</span>
                     </label>
 
-                    <div id="saleGstRateGroup" class="flex items-center gap-1.5 text-xs transition-opacity duration-150">
+                    <div id="saleGstRateGroup" class="flex items-center gap-1.5 text-xs transition-opacity duration-150 opacity-40 pointer-events-none">
                         <label for="saleGstRate" class="text-slate-500 font-medium whitespace-nowrap">GST Rate:</label>
                         <select name="tax_rate" id="saleGstRate" class="form-input text-xs py-1 px-2 rounded-lg border-slate-300 font-semibold text-slate-700 bg-white">
                             <option value="18" selected>18% (Standard)</option>
@@ -367,7 +366,7 @@
                     </div>
                 </div>
                 <div class="text-[11px] text-slate-500 flex items-center justify-between" id="saleGstHint">
-                    <span>GST is optional. Uncheck to create a zero-tax order without GST.</span>
+                    <span>GST is 0% by default. Check "Apply GST" to add tax if required.</span>
                 </div>
             </div>
 
@@ -378,11 +377,11 @@
                     <span class="font-mono font-semibold" id="saleSubtotalDisp">₹0.00</span>
                 </div>
                 <div class="flex justify-between text-slate-600">
-                    <span id="saleTaxRateLabel">GST (18%):</span>
-                    <span class="font-mono font-semibold" id="saleTaxDisp">₹0.00</span>
+                    <span id="saleTaxRateLabel">GST (0% - Not Applied):</span>
+                    <span class="font-mono font-semibold text-slate-400" id="saleTaxDisp">₹0.00</span>
                 </div>
                 <div class="flex justify-between text-base font-bold text-slate-900 border-t border-slate-200 pt-1.5">
-                    <span id="saleTotalLabel">Total Amount (with GST):</span>
+                    <span id="saleTotalLabel">Total Amount:</span>
                     <span class="font-mono text-rose-600" id="saleTotalDisp">₹0.00</span>
                 </div>
             </div>

@@ -131,6 +131,35 @@ class SaleOrderFreeTextProductTest extends TestCase
     }
 
     /**
+     * A sale order defaults to 0% GST when tax is unspecified.
+     */
+    public function test_sale_order_defaults_to_zero_gst_when_unspecified(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $payload = [
+            'customer_id' => $this->customer->id,
+            'product_name' => 'Kent Grand Default RO Purifier',
+            'quantity' => 1,
+            'unit_price' => 15000.00,
+            'discount_amount' => 0.00,
+        ];
+
+        $response = $this->postJson(route('sales.store'), $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $sale = Sale::latest()->first();
+        $this->assertNotNull($sale);
+
+        // Subtotal = 15000, Tax = 0.00, Total = 15000
+        $this->assertEquals(15000.00, (float) $sale->subtotal);
+        $this->assertEquals(0.00, (float) $sale->tax_amount);
+        $this->assertEquals(15000.00, (float) $sale->total_amount);
+    }
+
+    /**
      * A sale order can be created with any custom free-text product name.
      */
     public function test_sale_order_can_be_created_with_custom_free_text_product_name(): void
@@ -148,6 +177,8 @@ class SaleOrderFreeTextProductTest extends TestCase
             'quantity' => 2,
             'unit_price' => 18500.00,
             'discount_amount' => 1000.00,
+            'apply_gst' => 1,
+            'tax_rate' => 18.00,
             'serial_number' => 'SN-KENT-2026-XYZ',
             'notes' => 'Custom installation with 1-year AMC included',
         ];
