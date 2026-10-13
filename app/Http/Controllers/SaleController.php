@@ -13,6 +13,7 @@ use App\Models\CustomerAsset;
 use App\Models\BusinessSequence;
 use App\Models\AuditLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class SaleController extends Controller
@@ -65,13 +66,15 @@ class SaleController extends Controller
     }
 
     /**
-     * Store new sales order with GST calculation & automatic invoice creation
+     * Store new sales order with GST calculation & automatic invoice creation.
+     * Supports both catalogue product selection and custom free-text product names.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'nullable',
+            'product_name' => 'nullable|string|max:255',
             'quantity' => 'required|integer|min:1',
             'unit_price' => 'required|numeric|min:0',
             'discount_amount' => 'nullable|numeric|min:0',
@@ -80,13 +83,55 @@ class SaleController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($validated, $request) {
-            $customer = Customer::findOrFail($validated['customer_id']);
-            $product = Product::findOrFail($validated['product_id']);
+        $productName = trim((string) ($request->input('product_name') ?? ''));
+        $productId = $request->input('product_id');
 
+        if (empty($productName) && empty($productId)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'product_name' => 'Please provide a product name.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($validated, $request, $productName, $productId) {
+            $customer = Customer::findOrFail($validated['customer_id']);
+
+            $product = null;
+            if (!empty($productId)) {
+                $product = Product::find($productId);
+            }
+
+            if (!$product && !empty($productName)) {
+                $product = Product::where('name', $productName)->first();
+            }
+
+            $effectiveProductName = !empty($productName) ? $productName : ($product ? $product->name : 'Custom Product');
             $quantity = (int) $validated['quantity'];
             $unitPrice = (float) $validated['unit_price'];
             $discount = (float) ($validated['discount_amount'] ?? 0);
+
+            // Auto-create product if it doesn't exist in master catalogue
+            if (!$product) {
+                $cleanSlug = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', substr($effectiveProductName, 0, 8)));
+                $skuBase = !empty($cleanSlug) ? 'PRD-' . $cleanSlug : 'PRD-' . strtoupper(Str::random(6));
+                $sku = $skuBase;
+                $counter = 1;
+                while (Product::where('sku', $sku)->exists()) {
+                    $sku = $skuBase . '-' . $counter++;
+                }
+
+                $product = Product::create([
+                    'sku' => $sku,
+                    'name' => $effectiveProductName,
+                    'product_type' => 'RO_MACHINE',
+                    'brand' => 'Enterprises CRM',
+                    'model' => 'Custom',
+                    'unit_price' => $unitPrice,
+                    'tax_rate_percent' => 18.00,
+                    'default_warranty_months' => 12,
+                    'default_service_interval_months' => 6,
+                    'is_active' => true,
+                ]);
+            }
 
             $subtotal = ($quantity * $unitPrice) - $discount;
             $taxRate = 18.00; // 18% standard GST
@@ -111,7 +156,7 @@ class SaleController extends Controller
             SaleItem::create([
                 'sale_id' => $sale->id,
                 'product_id' => $product->id,
-                'product_name_snapshot' => $product->name,
+                'product_name_snapshot' => $effectiveProductName,
                 'sku_snapshot' => $product->sku,
                 'quantity' => $quantity,
                 'unit_price_snapshot' => $unitPrice,
@@ -119,8 +164,8 @@ class SaleController extends Controller
                 'tax_rate_percent' => $taxRate,
                 'tax_amount' => $taxAmount,
                 'line_total' => $totalAmount,
-                'warranty_months' => $product->default_warranty_months,
-                'service_interval_months' => $product->default_service_interval_months,
+                'warranty_months' => $product->default_warranty_months ?? 12,
+                'service_interval_months' => $product->default_service_interval_months ?? 6,
                 'serial_number' => $validated['serial_number'] ?? null,
             ]);
 
@@ -152,7 +197,7 @@ class SaleController extends Controller
                 'invoice_id' => $invoice->id,
                 'product_id' => $product->id,
                 'item_type' => 'PRODUCT',
-                'name_snapshot' => $product->name,
+                'name_snapshot' => $effectiveProductName,
                 'quantity' => $quantity,
                 'unit_price_snapshot' => $unitPrice,
                 'discount_amount' => $discount,
@@ -161,7 +206,11 @@ class SaleController extends Controller
                 'line_total' => $totalAmount,
             ]);
 
-            AuditLog::log('CREATE', 'SALE', $sale->id, null, ['number' => $sale->sale_number, 'amount' => $totalAmount]);
+            AuditLog::log('CREATE', 'SALE', $sale->id, null, [
+                'number' => $sale->sale_number, 
+                'amount' => $totalAmount,
+                'product' => $effectiveProductName
+            ]);
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([

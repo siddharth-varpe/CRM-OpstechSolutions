@@ -273,15 +273,38 @@
             </div>
 
             <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Product / Machine <span class="text-rose-500">*</span></label>
-                <select name="product_id" id="saleProductSelect" required class="form-input text-sm">
-                    <option value="">Select Product</option>
-                    @foreach($products as $p)
-                        <option value="{{ $p->id }}" data-price="{{ $p->unit_price }}" data-sku="{{ $p->sku }}">
-                            {{ $p->name }} ({{ $p->sku }}) - ₹{{ number_format($p->unit_price, 2) }}
-                        </option>
-                    @endforeach
-                </select>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-semibold text-slate-700">
+                        Product / Machine Name <span class="text-rose-500">*</span>
+                    </label>
+                    <span class="text-[11px] text-slate-400 font-normal">Free text &bull; No options limit</span>
+                </div>
+                <div class="relative">
+                    <input type="text" 
+                           name="product_name" 
+                           id="saleProductName" 
+                           list="saleProductList" 
+                           placeholder="Type product name (e.g. Kent Grand Plus RO, Industrial 100 LPH, Water Purifier...)" 
+                           required 
+                           autocomplete="off" 
+                           class="form-input text-sm font-semibold pr-9 text-slate-900">
+                    <input type="hidden" name="product_id" id="saleProductId" value="">
+                    
+                    <datalist id="saleProductList">
+                        @foreach($products as $p)
+                            <option value="{{ $p->name }}" data-price="{{ $p->unit_price }}" data-sku="{{ $p->sku }}" data-id="{{ $p->id }}">
+                                ₹{{ number_format($p->unit_price, 2) }} (SKU: {{ $p->sku }})
+                            </option>
+                        @endforeach
+                    </datalist>
+
+                    <div class="absolute right-3 top-2.5 text-slate-400 pointer-events-none">
+                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Enter any free-text product name. The sale order will proceed directly with this product name.
+                </p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -354,10 +377,29 @@ $(document).ready(function() {
         $('#saleTotalDisp').text('₹' + total.toFixed(2));
     }
 
-    $('#saleProductSelect').on('change', function() {
-        const price = $(this).find(':selected').data('price') || 0;
-        $('#saleUnitPrice').val(price);
+    const catalogProducts = @json($products->map(fn($p) => [
+        'id' => $p->id, 
+        'name' => $p->name, 
+        'price' => (float)$p->unit_price, 
+        'sku' => $p->sku
+    ]));
+
+    $('#saleProductName').on('input change', function() {
+        const val = ($(this).val() || '').trim().toLowerCase();
+        const matched = catalogProducts.find(p => p.name.toLowerCase() === val);
+        if (matched) {
+            $('#saleProductId').val(matched.id);
+            if (!$('#saleUnitPrice').data('user-touched') || parseFloat($('#saleUnitPrice').val()) === 0) {
+                $('#saleUnitPrice').val(matched.price);
+            }
+        } else {
+            $('#saleProductId').val('');
+        }
         recalcSale();
+    });
+
+    $('#saleUnitPrice').on('input', function() {
+        $(this).data('user-touched', true);
     });
 
     $('#saleQty, #saleUnitPrice, #saleDiscount').on('input', function() {
