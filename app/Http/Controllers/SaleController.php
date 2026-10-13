@@ -46,6 +46,14 @@ class SaleController extends Controller
 
         $customers = Customer::where('status', 'ACTIVE')->get();
         $products = Product::where('is_active', true)->get();
+        $catalogProducts = $products->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'price' => (float) $p->unit_price,
+                'sku' => $p->sku,
+            ];
+        })->values();
 
         return view('sales.index', [
             'sales' => $sales,
@@ -53,6 +61,7 @@ class SaleController extends Controller
             'search' => $search,
             'customers' => $customers,
             'products' => $products,
+            'catalogProducts' => $catalogProducts,
         ]);
     }
 

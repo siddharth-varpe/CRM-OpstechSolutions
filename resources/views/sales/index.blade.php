@@ -377,12 +377,7 @@ $(document).ready(function() {
         $('#saleTotalDisp').text('₹' + total.toFixed(2));
     }
 
-    const catalogProducts = @json($products->map(fn($p) => [
-        'id' => $p->id, 
-        'name' => $p->name, 
-        'price' => (float)$p->unit_price, 
-        'sku' => $p->sku
-    ]));
+    const catalogProducts = @json($catalogProducts ?? []);
 
     $('#saleProductName').on('input change', function() {
         const val = ($(this).val() || '').trim().toLowerCase();

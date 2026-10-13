@@ -30,6 +30,20 @@ class SaleOrderFreeTextProductTest extends TestCase
     }
 
     /**
+     * Sales index view renders cleanly with HTTP 200 and loads catalog products.
+     */
+    public function test_sales_index_page_renders_successfully(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $response = $this->get(route('sales.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('saleProductName');
+        $response->assertSee('saleProductList');
+    }
+
+    /**
      * A sale order can be created with any custom free-text product name.
      */
     public function test_sale_order_can_be_created_with_custom_free_text_product_name(): void
