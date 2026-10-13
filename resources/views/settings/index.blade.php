@@ -202,7 +202,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Default GST Rate (%)</label>
-                        <input type="number" name="default_gst_rate" value="{{ $settings['default_gst_rate'] ?? 18 }}" min="0" max="100" step="0.5" class="form-input text-sm font-mono">
+                        <input type="number" name="default_gst_rate" value="{{ $settings['default_gst_rate'] ?? 0 }}" min="0" max="100" step="0.5" class="form-input text-sm font-mono">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Standard HSN / SAC Code</label>

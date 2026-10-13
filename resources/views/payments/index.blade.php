@@ -260,6 +260,26 @@
                 </div>
             </div>
 
+            <!-- Partial Payment: Next Due Date Option -->
+            <div id="partialDueDateContainer" class="hidden p-3 bg-amber-50/90 rounded-xl border border-amber-200/90 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-semibold text-amber-800 flex items-center gap-1.5">
+                        <i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600"></i>
+                        Partial Payment Detected
+                    </span>
+                    <span class="font-mono font-bold text-amber-700" id="remainingBalanceDisp">Remaining: ₹0.00</span>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">
+                        Next Due Date for Remaining Amount
+                    </label>
+                    <input type="date" name="next_due_date" id="paymentNextDueDate" min="{{ date('Y-m-d') }}" class="form-input text-xs bg-white font-medium">
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Schedule the date on which the customer is meant to pay the remaining balance.
+                    </p>
+                </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Mode <span class="text-rose-500">*</span></label>
@@ -361,9 +381,28 @@
 
 <script>
 $(document).ready(function() {
+    function checkPartialPayment() {
+        const balance = parseFloat($('#paymentInvoiceSelect').find(':selected').data('balance')) || 0;
+        const amount = parseFloat($('#paymentAmountInput').val()) || 0;
+        const remaining = balance - amount;
+
+        if (balance > 0 && amount > 0 && remaining > 0) {
+            $('#partialDueDateContainer').removeClass('hidden');
+            $('#remainingBalanceDisp').text('Remaining: ₹' + remaining.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } else {
+            $('#partialDueDateContainer').addClass('hidden');
+        }
+    }
+
     $('#paymentInvoiceSelect').on('change', function() {
         const balance = $(this).find(':selected').data('balance') || '';
         $('#paymentAmountInput').val(balance).attr('max', balance);
+        checkPartialPayment();
+    });
+
+    $('#paymentAmountInput').on('input change', function() {
+        checkPartialPayment();
     });
 
     CRM.handleAjaxForm('#formRecordPayment', function(res) {

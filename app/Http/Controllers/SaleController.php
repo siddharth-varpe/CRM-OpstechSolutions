@@ -143,12 +143,12 @@ class SaleController extends Controller
                     } elseif (is_numeric($taxRateInput)) {
                         $taxRate = (float) $taxRateInput;
                     } else {
-                        $taxRate = (float) SystemSetting::get('default_gst_rate', 18.00);
+                        $taxRate = (float) SystemSetting::get('default_gst_rate', 0.00);
                     }
                 } elseif ($request->filled('custom_tax_rate')) {
                     $taxRate = (float) $request->input('custom_tax_rate');
                 } else {
-                    $taxRate = (float) SystemSetting::get('default_gst_rate', 18.00);
+                    $taxRate = (float) SystemSetting::get('default_gst_rate', 0.00);
                 }
             }
 
@@ -171,7 +171,7 @@ class SaleController extends Controller
                     'brand' => 'Enterprises CRM',
                     'model' => 'Custom',
                     'unit_price' => $unitPrice,
-                    'tax_rate_percent' => $taxRate > 0 ? $taxRate : 18.00,
+                    'tax_rate_percent' => $taxRate > 0 ? $taxRate : 0.00,
                     'default_warranty_months' => 12,
                     'default_service_interval_months' => 6,
                     'is_active' => true,

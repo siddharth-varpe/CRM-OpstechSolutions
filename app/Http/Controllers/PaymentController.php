@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class PaymentController extends Controller
 {
@@ -101,6 +102,7 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:1',
             'payment_date' => 'required|date',
             'payment_mode' => 'required|string',
+            'next_due_date' => 'nullable|date',
             'transaction_reference' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
         ]);
@@ -118,6 +120,30 @@ class PaymentController extends Controller
 
             $receiptNumber = BusinessSequence::nextNumber('PAYMENT');
 
+            $newPaid = $invoice->paid_amount + $amount;
+            $newBalance = max(0, $invoice->total_amount - $newPaid);
+            $newStatus = $newBalance <= 0 ? 'PAID' : 'PARTIALLY_PAID';
+
+            $invoiceUpdate = [
+                'paid_amount' => $newPaid,
+                'balance_amount' => $newBalance,
+                'status' => $newStatus,
+            ];
+
+            // If customer makes a partial payment and specifies next due date, update invoice due_date
+            if ($newBalance > 0 && !empty($validated['next_due_date'])) {
+                $invoiceUpdate['due_date'] = $validated['next_due_date'];
+            }
+
+            $invoice->update($invoiceUpdate);
+
+            $notes = $validated['notes'] ?? '';
+            if ($newBalance > 0 && !empty($validated['next_due_date'])) {
+                $formattedDueDate = Carbon::parse($validated['next_due_date'])->format('d M Y');
+                $dueNote = "Next due date for remaining balance (₹" . number_format($newBalance, 2) . "): {$formattedDueDate}";
+                $notes = !empty($notes) ? "{$notes} | {$dueNote}" : $dueNote;
+            }
+
             $payment = Payment::create([
                 'id' => (string) Str::uuid(),
                 'payment_number' => $receiptNumber,
@@ -128,18 +154,8 @@ class PaymentController extends Controller
                 'payment_method' => $validated['payment_mode'],
                 'status' => 'COMPLETED',
                 'reference_number' => $validated['transaction_reference'] ?? null,
-                'notes' => $validated['notes'] ?? null,
+                'notes' => $notes ?: null,
                 'created_by' => auth()->id(),
-            ]);
-
-            $newPaid = $invoice->paid_amount + $amount;
-            $newBalance = max(0, $invoice->total_amount - $newPaid);
-            $newStatus = $newBalance <= 0 ? 'PAID' : 'PARTIALLY_PAID';
-
-            $invoice->update([
-                'paid_amount' => $newPaid,
-                'balance_amount' => $newBalance,
-                'status' => $newStatus,
             ]);
 
             AuditLog::create([
@@ -149,18 +165,30 @@ class PaymentController extends Controller
                 'action' => 'CREATE',
                 'user_id' => auth()->id() ?? 'system',
                 'performed_by' => auth()->user()->name ?? 'Staff',
-                'changes' => json_encode(['receipt_number' => $receiptNumber, 'amount' => $amount, 'invoice' => $invoice->invoice_number]),
+                'changes' => json_encode([
+                    'receipt_number' => $receiptNumber, 
+                    'amount' => $amount, 
+                    'remaining_balance' => $newBalance,
+                    'next_due_date' => $newBalance > 0 ? ($validated['next_due_date'] ?? null) : null,
+                    'invoice' => $invoice->invoice_number,
+                ]),
             ]);
+
+            $successMessage = "Payment of ₹" . number_format($amount, 2) . " recorded. Receipt # {$receiptNumber}";
+            if ($newBalance > 0 && !empty($validated['next_due_date'])) {
+                $formattedDueDate = Carbon::parse($validated['next_due_date'])->format('d M Y');
+                $successMessage .= ". Next due date for ₹" . number_format($newBalance, 2) . " set to {$formattedDueDate}.";
+            }
 
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => true,
-                    'message' => "Payment of ₹" . number_format($amount, 2) . " recorded. Receipt # {$receiptNumber}",
+                    'message' => $successMessage,
                     'data' => $payment,
                 ]);
             }
 
-            return redirect()->back()->with('success', "Payment {$receiptNumber} recorded successfully.");
+            return redirect()->back()->with('success', $successMessage);
         });
     }
 

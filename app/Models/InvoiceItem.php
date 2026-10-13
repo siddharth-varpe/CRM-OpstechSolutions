@@ -49,7 +49,7 @@ class InvoiceItem extends Model
 
     public function getTaxRateAttribute()
     {
-        return $this->tax_rate_percent ?? 18;
+        return $this->tax_rate_percent ?? (float) SystemSetting::get('default_gst_rate', 0);
     }
 
     public function getTotalAmountAttribute()

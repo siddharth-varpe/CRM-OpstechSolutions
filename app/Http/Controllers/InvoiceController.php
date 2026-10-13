@@ -126,7 +126,7 @@ class InvoiceController extends Controller
                 $qty = (float)$item['quantity'];
                 $price = (float)$item['unit_price'];
                 $disc = (float)($item['discount'] ?? 0);
-                $taxRate = (float)($item['tax_rate'] ?? SystemSetting::get('default_gst_rate', 18));
+                $taxRate = (float)($item['tax_rate'] ?? SystemSetting::get('default_gst_rate', 0));
 
                 $lineBase = ($qty * $price) - $disc;
                 $lineTax = ($lineBase * $taxRate) / 100;

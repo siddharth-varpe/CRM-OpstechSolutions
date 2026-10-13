@@ -418,5 +418,6 @@ class DatabaseSeeder extends Seeder
         SystemSetting::set('support_phone', '+91 9021653893', 'Customer care support phone');
         SystemSetting::set('support_email', 'varpes380@gmail.com', 'Customer care email');
         SystemSetting::set('gst_number', '27AAACS1234F1Z8', 'Default company GSTIN');
+        SystemSetting::set('default_gst_rate', '0', 'Default GST rate percentage for all invoices and sales');
     }
 }

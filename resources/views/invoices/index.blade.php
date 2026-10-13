@@ -321,7 +321,7 @@
                                     <input type="number" name="items[0][unit_price]" value="0" min="0" step="0.01" required class="form-input text-xs price-input">
                                 </td>
                                 <td class="p-2">
-                                    <input type="number" name="items[0][tax_rate]" value="{{ \App\Models\SystemSetting::get('default_gst_rate', 18) }}" min="0" step="1" class="form-input text-xs tax-input">
+                                    <input type="number" name="items[0][tax_rate]" value="{{ \App\Models\SystemSetting::get('default_gst_rate', 0) }}" min="0" step="1" class="form-input text-xs tax-input">
                                 </td>
                                 <td class="p-2 text-right font-mono font-bold text-slate-800 row-total">
                                     0.00
@@ -416,7 +416,7 @@ $(document).ready(function() {
                     <input type="number" name="items[${rowIndex}][unit_price]" value="0" min="0" step="0.01" required class="form-input text-xs price-input">
                 </td>
                 <td class="p-2">
-                    <input type="number" name="items[${rowIndex}][tax_rate]" value="{{ \App\Models\SystemSetting::get('default_gst_rate', 18) }}" min="0" step="1" class="form-input text-xs tax-input">
+                    <input type="number" name="items[${rowIndex}][tax_rate]" value="{{ \App\Models\SystemSetting::get('default_gst_rate', 0) }}" min="0" step="1" class="form-input text-xs tax-input">
                 </td>
                 <td class="p-2 text-right font-mono font-bold text-slate-800 row-total">
                     0.00
