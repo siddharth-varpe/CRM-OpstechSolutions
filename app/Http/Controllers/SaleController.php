@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\CustomerAsset;
 use App\Models\BusinessSequence;
 use App\Models\AuditLog;
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -88,6 +89,9 @@ class SaleController extends Controller
             'unit_price' => 'required|numeric|min:0',
             'discount_amount' => 'nullable|numeric|min:0',
             'serial_number' => 'nullable|string|max:100',
+            'apply_gst' => 'nullable',
+            'tax_rate' => 'nullable',
+            'custom_tax_rate' => 'nullable|numeric|min:0|max:100',
             'auto_invoice' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
@@ -118,6 +122,36 @@ class SaleController extends Controller
             $unitPrice = (float) $validated['unit_price'];
             $discount = (float) ($validated['discount_amount'] ?? 0);
 
+            // Determine optional GST rate
+            $applyGst = true;
+            if ($request->has('apply_gst')) {
+                $raw = $request->input('apply_gst');
+                if ($raw === '0' || $raw === 0 || $raw === false || $raw === 'false' || $raw === 'off' || $raw === 'no') {
+                    $applyGst = false;
+                }
+            }
+
+            if (!$applyGst) {
+                $taxRate = 0.00;
+            } else {
+                if ($request->filled('tax_rate')) {
+                    $taxRateInput = $request->input('tax_rate');
+                    if ($taxRateInput === 'custom' && $request->filled('custom_tax_rate')) {
+                        $taxRate = (float) $request->input('custom_tax_rate');
+                    } elseif (is_numeric($taxRateInput)) {
+                        $taxRate = (float) $taxRateInput;
+                    } else {
+                        $taxRate = (float) SystemSetting::get('default_gst_rate', 18.00);
+                    }
+                } elseif ($request->filled('custom_tax_rate')) {
+                    $taxRate = (float) $request->input('custom_tax_rate');
+                } else {
+                    $taxRate = (float) SystemSetting::get('default_gst_rate', 18.00);
+                }
+            }
+
+            $taxRate = max(0.00, round($taxRate, 2));
+
             // Auto-create product if it doesn't exist in master catalogue
             if (!$product) {
                 $cleanSlug = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', substr($effectiveProductName, 0, 8)));
@@ -135,7 +169,7 @@ class SaleController extends Controller
                     'brand' => 'Enterprises CRM',
                     'model' => 'Custom',
                     'unit_price' => $unitPrice,
-                    'tax_rate_percent' => 18.00,
+                    'tax_rate_percent' => $taxRate > 0 ? $taxRate : 18.00,
                     'default_warranty_months' => 12,
                     'default_service_interval_months' => 6,
                     'is_active' => true,
@@ -143,8 +177,7 @@ class SaleController extends Controller
             }
 
             $subtotal = ($quantity * $unitPrice) - $discount;
-            $taxRate = 18.00; // 18% standard GST
-            $taxAmount = round(($subtotal * $taxRate) / 100, 2);
+            $taxAmount = $taxRate > 0 ? round(($subtotal * $taxRate) / 100, 2) : 0.00;
             $totalAmount = $subtotal + $taxAmount;
 
             $saleNumber = BusinessSequence::nextNumber('SALE');

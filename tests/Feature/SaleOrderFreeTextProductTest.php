@@ -41,6 +41,93 @@ class SaleOrderFreeTextProductTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('saleProductName');
         $response->assertSee('saleProductList');
+        $response->assertSee('saleApplyGst');
+        $response->assertSee('saleGstRate');
+    }
+
+    /**
+     * A sale order can be created without GST (0% tax).
+     */
+    public function test_sale_order_can_be_created_without_gst(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $payload = [
+            'customer_id' => $this->customer->id,
+            'product_name' => 'Aquaguard Compact RO System (Zero GST)',
+            'quantity' => 1,
+            'unit_price' => 12000.00,
+            'discount_amount' => 500.00,
+            'apply_gst' => 0,
+            'notes' => 'Non-GST customer billing',
+        ];
+
+        $response = $this->postJson(route('sales.store'), $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $sale = Sale::latest()->first();
+        $this->assertNotNull($sale);
+
+        // Subtotal = 12000 - 500 = 11500
+        // GST = 0.00
+        // Total = 11500
+        $this->assertEquals(11500.00, (float) $sale->subtotal);
+        $this->assertEquals(0.00, (float) $sale->tax_amount);
+        $this->assertEquals(11500.00, (float) $sale->total_amount);
+
+        $saleItem = SaleItem::where('sale_id', $sale->id)->first();
+        $this->assertEquals(0.00, (float) $saleItem->tax_rate_percent);
+        $this->assertEquals(0.00, (float) $saleItem->tax_amount);
+        $this->assertEquals(11500.00, (float) $saleItem->line_total);
+
+        $invoice = Invoice::where('sale_id', $sale->id)->first();
+        $this->assertNotNull($invoice);
+        $this->assertEquals(0.00, (float) $invoice->tax_amount);
+        $this->assertEquals(0.00, (float) $invoice->cgst_amount);
+        $this->assertEquals(0.00, (float) $invoice->sgst_amount);
+        $this->assertEquals(11500.00, (float) $invoice->total_amount);
+
+        // Also verify the invoice detail page renders cleanly with 0% GST
+        $invoicePage = $this->get(route('invoices.show', $invoice->id));
+        $invoicePage->assertStatus(200);
+        $invoicePage->assertSee('Exempt / Nil Rated');
+    }
+
+    /**
+     * A sale order can be created with a custom or non-standard GST rate (e.g. 12%).
+     */
+    public function test_sale_order_can_be_created_with_custom_gst_rate(): void
+    {
+        $this->actingAs($this->adminUser);
+
+        $payload = [
+            'customer_id' => $this->customer->id,
+            'product_name' => 'Industrial RO Membrane Vessel (12% GST)',
+            'quantity' => 1,
+            'unit_price' => 10000.00,
+            'discount_amount' => 0.00,
+            'apply_gst' => 1,
+            'tax_rate' => 12.00,
+        ];
+
+        $response = $this->postJson(route('sales.store'), $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $sale = Sale::latest()->first();
+        $this->assertNotNull($sale);
+
+        // Subtotal = 10000, Tax 12% = 1200, Total = 11200
+        $this->assertEquals(10000.00, (float) $sale->subtotal);
+        $this->assertEquals(1200.00, (float) $sale->tax_amount);
+        $this->assertEquals(11200.00, (float) $sale->total_amount);
+
+        $saleItem = SaleItem::where('sale_id', $sale->id)->first();
+        $this->assertEquals(12.00, (float) $saleItem->tax_rate_percent);
+        $this->assertEquals(1200.00, (float) $saleItem->tax_amount);
     }
 
     /**

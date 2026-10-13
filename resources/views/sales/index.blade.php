@@ -184,7 +184,11 @@
                             </td>
 
                             <td class="py-3.5 px-4 text-right font-mono text-xs text-slate-600">
-                                ₹{{ number_format($sale->tax_amount, 2) }}
+                                @if((float)$sale->tax_amount > 0)
+                                    ₹{{ number_format($sale->tax_amount, 2) }}
+                                @else
+                                    <span class="text-slate-400 font-sans text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">0% (None)</span>
+                                @endif
                             </td>
 
                             <td class="py-3.5 px-4 text-right font-mono text-xs font-bold text-slate-900">
@@ -252,7 +256,7 @@
                 </div>
                 <div>
                     <h3 class="font-bold text-slate-900 text-lg">New Sales Order</h3>
-                    <p class="text-xs text-slate-500">Auto-mints GST tax invoice &amp; warranty registration</p>
+                    <p class="text-xs text-slate-500">Auto-mints invoice &amp; warranty registration</p>
                 </div>
             </div>
             <button onclick="CRM.closeModal('modalCreateSale')" class="text-slate-400 hover:text-slate-600">
@@ -329,6 +333,44 @@
                 </div>
             </div>
 
+            <!-- Optional GST / Tax Options -->
+            <div class="p-3 bg-slate-50/90 rounded-xl border border-slate-200/90 space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="hidden" name="apply_gst" value="0">
+                        <input type="checkbox" 
+                               name="apply_gst" 
+                               id="saleApplyGst" 
+                               value="1" 
+                               checked 
+                               class="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 cursor-pointer">
+                        <span class="text-xs font-semibold text-slate-800">Apply GST (Tax)</span>
+                    </label>
+
+                    <div id="saleGstRateGroup" class="flex items-center gap-1.5 text-xs transition-opacity duration-150">
+                        <label for="saleGstRate" class="text-slate-500 font-medium whitespace-nowrap">GST Rate:</label>
+                        <select name="tax_rate" id="saleGstRate" class="form-input text-xs py-1 px-2 rounded-lg border-slate-300 font-semibold text-slate-700 bg-white">
+                            <option value="18" selected>18% (Standard)</option>
+                            <option value="12">12%</option>
+                            <option value="5">5%</option>
+                            <option value="28">28%</option>
+                            <option value="custom">Custom %</option>
+                        </select>
+                        <input type="number" 
+                               name="custom_tax_rate" 
+                               id="saleCustomTaxRate" 
+                               min="0" 
+                               max="100" 
+                               step="0.01" 
+                               placeholder="%" 
+                               class="hidden form-input text-xs py-1 px-2 w-16 font-mono text-slate-700 bg-white">
+                    </div>
+                </div>
+                <div class="text-[11px] text-slate-500 flex items-center justify-between" id="saleGstHint">
+                    <span>GST is optional. Uncheck to create a zero-tax order without GST.</span>
+                </div>
+            </div>
+
             <!-- Auto Calculation preview -->
             <div class="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
                 <div class="flex justify-between text-slate-600">
@@ -336,11 +378,11 @@
                     <span class="font-mono font-semibold" id="saleSubtotalDisp">₹0.00</span>
                 </div>
                 <div class="flex justify-between text-slate-600">
-                    <span>GST (18%):</span>
+                    <span id="saleTaxRateLabel">GST (18%):</span>
                     <span class="font-mono font-semibold" id="saleTaxDisp">₹0.00</span>
                 </div>
                 <div class="flex justify-between text-base font-bold text-slate-900 border-t border-slate-200 pt-1.5">
-                    <span>Total Amount (with GST):</span>
+                    <span id="saleTotalLabel">Total Amount (with GST):</span>
                     <span class="font-mono text-rose-600" id="saleTotalDisp">₹0.00</span>
                 </div>
             </div>
@@ -367,13 +409,34 @@ $(document).ready(function() {
         const qty = parseFloat($('#saleQty').val()) || 0;
         const price = parseFloat($('#saleUnitPrice').val()) || 0;
         const disc = parseFloat($('#saleDiscount').val()) || 0;
+        const applyGst = $('#saleApplyGst').is(':checked');
+
+        let rate = 0;
+        if (applyGst) {
+            const selectedRate = $('#saleGstRate').val();
+            if (selectedRate === 'custom') {
+                rate = parseFloat($('#saleCustomTaxRate').val()) || 0;
+            } else {
+                rate = parseFloat(selectedRate) || 0;
+            }
+        }
 
         const subtotal = Math.max(0, (qty * price) - disc);
-        const tax = (subtotal * 18) / 100;
+        const tax = (applyGst && rate > 0) ? (subtotal * rate) / 100 : 0;
         const total = subtotal + tax;
 
         $('#saleSubtotalDisp').text('₹' + subtotal.toFixed(2));
-        $('#saleTaxDisp').text('₹' + tax.toFixed(2));
+
+        if (applyGst && rate > 0) {
+            $('#saleTaxRateLabel').text('GST (' + rate + '%):');
+            $('#saleTaxDisp').text('₹' + tax.toFixed(2)).removeClass('text-slate-400').addClass('text-slate-600');
+            $('#saleTotalLabel').text('Total Amount (with GST):');
+        } else {
+            $('#saleTaxRateLabel').text('GST (0% - Not Applied):');
+            $('#saleTaxDisp').text('₹0.00').addClass('text-slate-400').removeClass('text-slate-600');
+            $('#saleTotalLabel').text('Total Amount:');
+        }
+
         $('#saleTotalDisp').text('₹' + total.toFixed(2));
     }
 
@@ -395,6 +458,31 @@ $(document).ready(function() {
 
     $('#saleUnitPrice').on('input', function() {
         $(this).data('user-touched', true);
+    });
+
+    $('#saleApplyGst').on('change', function() {
+        const checked = $(this).is(':checked');
+        if (checked) {
+            $('#saleGstRateGroup').removeClass('opacity-40 pointer-events-none').addClass('opacity-100');
+            $('#saleGstHint').html('<span>GST enabled. Standard or custom tax will be added to the invoice.</span>');
+        } else {
+            $('#saleGstRateGroup').addClass('opacity-40 pointer-events-none').removeClass('opacity-100');
+            $('#saleGstHint').html('<span class="text-amber-600 font-medium">GST disabled. Sale order &amp; invoice will be created with ₹0.00 tax.</span>');
+        }
+        recalcSale();
+    });
+
+    $('#saleGstRate').on('change', function() {
+        if ($(this).val() === 'custom') {
+            $('#saleCustomTaxRate').removeClass('hidden').focus();
+        } else {
+            $('#saleCustomTaxRate').addClass('hidden');
+        }
+        recalcSale();
+    });
+
+    $('#saleCustomTaxRate').on('input change', function() {
+        recalcSale();
     });
 
     $('#saleQty, #saleUnitPrice, #saleDiscount').on('input', function() {

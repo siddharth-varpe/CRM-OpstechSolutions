@@ -149,7 +149,7 @@
                 <tbody class="divide-y divide-slate-100">
                     @forelse($invoice->items as $idx => $it)
                         @php
-                            $taxRate = $it->tax_rate ?? \App\Models\SystemSetting::get('default_gst_rate', 18);
+                            $taxRate = isset($it->tax_rate_percent) ? (float)$it->tax_rate_percent : ($it->tax_rate ?? \App\Models\SystemSetting::get('default_gst_rate', 18));
                             $taxableVal = $it->quantity * $it->unit_price;
                             $taxVal = ($taxableVal * $taxRate) / 100;
                             $totalVal = $taxableVal + $taxVal;
@@ -165,7 +165,7 @@
                             <td class="py-3.5 px-3 text-center font-mono font-semibold">{{ $it->quantity }}</td>
                             <td class="py-3.5 px-3 text-right font-mono">₹{{ number_format($it->unit_price, 2) }}</td>
                             <td class="py-3.5 px-3 text-right font-mono">₹{{ number_format($taxableVal, 2) }}</td>
-                            <td class="py-3.5 px-3 text-right font-mono text-slate-600">{{ $taxRate }}%</td>
+                            <td class="py-3.5 px-3 text-right font-mono text-slate-600">{{ $taxRate > 0 ? $taxRate . '%' : '0%' }}</td>
                             <td class="py-3.5 px-3 text-right font-mono font-bold text-slate-900">₹{{ number_format($it->total_amount, 2) }}</td>
                         </tr>
                     @empty
@@ -191,14 +191,21 @@
                     <span>Taxable Subtotal:</span>
                     <span class="font-mono font-semibold">₹{{ number_format($invoice->subtotal, 2) }}</span>
                 </div>
-                <div class="flex justify-between text-slate-600">
-                    <span>CGST:</span>
-                    <span class="font-mono font-semibold">₹{{ number_format($invoice->tax_amount / 2, 2) }}</span>
-                </div>
-                <div class="flex justify-between text-slate-600">
-                    <span>SGST:</span>
-                    <span class="font-mono font-semibold">₹{{ number_format($invoice->tax_amount / 2, 2) }}</span>
-                </div>
+                @if((float)$invoice->tax_amount > 0)
+                    <div class="flex justify-between text-slate-600">
+                        <span>CGST:</span>
+                        <span class="font-mono font-semibold">₹{{ number_format($invoice->tax_amount / 2, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-slate-600">
+                        <span>SGST:</span>
+                        <span class="font-mono font-semibold">₹{{ number_format($invoice->tax_amount / 2, 2) }}</span>
+                    </div>
+                @else
+                    <div class="flex justify-between text-slate-500 italic">
+                        <span>GST / Tax:</span>
+                        <span class="font-mono font-semibold">₹0.00 (Exempt / Nil Rated)</span>
+                    </div>
+                @endif
                 <div class="flex justify-between text-base font-bold text-slate-900 border-t border-slate-200 pt-2">
                     <span>Total Amount (INR):</span>
                     <span class="font-mono text-sky-700 text-lg">₹{{ number_format($invoice->total_amount, 2) }}</span>
