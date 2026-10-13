@@ -302,22 +302,32 @@
             <!-- Step 1: Upload & File Selection Area -->
             <div id="importStepUpload" class="space-y-4">
                 <!-- Dropzone Area -->
-                <div id="importDropZone" class="border-2 border-dashed border-slate-200 hover:border-sky-500 rounded-2xl p-6 text-center bg-slate-50/60 hover:bg-sky-50/30 transition-all cursor-pointer">
-                    <input type="file" id="inputImportFile" accept=".csv, .xlsx, .xls, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="hidden">
-                    <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center mx-auto mb-3 text-sky-600">
-                        <i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
-                    </div>
-                    <div class="text-xs font-bold text-slate-800">
-                        <span class="text-sky-600 hover:underline">Click to browse file</span> or drag & drop here
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-1">Accepts Microsoft Excel (.xlsx, .xls) and Comma-Separated Values (.csv)</p>
+                <div id="importDropZone" class="relative overflow-hidden border-2 border-dashed border-slate-300 hover:border-sky-500 rounded-2xl p-6 text-center bg-slate-50/70 hover:bg-sky-50/40 transition-all cursor-pointer group">
+                    <!-- Native transparent file input covering the entire dropzone -->
+                    <input type="file" 
+                           id="inputImportFile" 
+                           name="file" 
+                           accept=".csv,.xlsx,.xls,.txt" 
+                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                           title="Click to browse file or drag & drop here">
                     
-                    <!-- Selected File Pill -->
-                    <div id="selectedFileInfo" class="hidden mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-100 text-sky-800 text-xs font-semibold">
+                    <!-- Decorative inner content with pointer-events-none so it never intercepts clicks or drag & drop -->
+                    <div class="pointer-events-none select-none">
+                        <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center mx-auto mb-3 text-sky-600 group-hover:scale-105 group-hover:border-sky-200 transition-all">
+                            <i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
+                        </div>
+                        <div class="text-xs font-bold text-slate-800">
+                            <span class="text-sky-600 underline decoration-sky-400 font-semibold">Click to browse file</span> or drag & drop here
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">Accepts Microsoft Excel (.xlsx, .xls) and Comma-Separated Values (.csv)</p>
+                    </div>
+                    
+                    <!-- Selected File Pill (z-20 so it sits above the file input and buttons work) -->
+                    <div id="selectedFileInfo" class="hidden relative z-20 mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-100 text-sky-800 text-xs font-semibold shadow-xs">
                         <i data-lucide="check-circle" class="w-3.5 h-3.5 text-sky-600"></i>
                         <span id="selectedFileName">file.csv</span>
                         <span id="selectedFileSize" class="text-[10px] text-sky-600 font-mono">(0 KB)</span>
-                        <button type="button" id="btnRemoveSelectedFile" class="ml-1 text-sky-700 hover:text-rose-600">
+                        <button type="button" id="btnRemoveSelectedFile" class="ml-1 text-sky-700 hover:text-rose-600 p-0.5 rounded-full hover:bg-sky-200 transition" title="Remove file">
                             <i data-lucide="x" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
@@ -532,42 +542,61 @@ $(document).ready(function() {
         openModal('add-customer-modal');
     }
 
-    // Dropzone Click
-    $('#importDropZone').on('click', function(e) {
+    const $drop = $('#importDropZone');
+    const $fileInput = $('#inputImportFile');
+
+    // Prevent default window navigation if a file is dropped in modal
+    $('#import-customer-modal').on('dragover drop', function(e) {
+        e.preventDefault();
+    });
+
+    // Fallback click on dropzone container in case user clicks outside the input bounds
+    $drop.on('click', function(e) {
         if ($(e.target).closest('#btnRemoveSelectedFile').length) return;
-        $('#inputImportFile').trigger('click');
+        if (e.target !== $fileInput[0]) {
+            $fileInput[0].click();
+        }
     });
 
     // Remove file
     $('#btnRemoveSelectedFile').on('click', function(e) {
+        e.preventDefault();
         e.stopPropagation();
         resetCustomerImportModal();
     });
 
-    // File Input change
-    $('#inputImportFile').on('change', function(e) {
-        const file = e.target.files[0];
-        handleFileSelection(file);
+    // File Input change (triggered natively on file select or drop)
+    $fileInput.on('change', function(e) {
+        const file = this.files && this.files.length ? this.files[0] : (e.target.files ? e.target.files[0] : null);
+        if (file) {
+            handleFileSelection(file);
+        }
     });
 
-    // Drag & Drop
-    const $drop = $('#importDropZone');
-    $drop.on('dragover dragenter', function(e) {
+    // Drag & Drop events on the input/dropzone
+    $fileInput.on('dragenter dragover', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        $drop.addClass('border-sky-500 bg-sky-50/50');
+        $drop.addClass('border-sky-500 bg-sky-50/80 ring-2 ring-sky-300/60');
     });
-    $drop.on('dragleave drop', function(e) {
+
+    $fileInput.on('dragleave', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        $drop.removeClass('border-sky-500 bg-sky-50/50');
+        $drop.removeClass('border-sky-500 bg-sky-50/80 ring-2 ring-sky-300/60');
     });
-    $drop.on('drop', function(e) {
+
+    $fileInput.on('drop', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        $drop.removeClass('border-sky-500 bg-sky-50/50');
-        const dt = e.originalEvent.dataTransfer;
+        $drop.removeClass('border-sky-500 bg-sky-50/80 ring-2 ring-sky-300/60');
+        const dt = e.originalEvent && e.originalEvent.dataTransfer ? e.originalEvent.dataTransfer : null;
         if (dt && dt.files && dt.files.length) {
+            try {
+                $fileInput[0].files = dt.files;
+            } catch (err) {
+                // Some browsers prevent programmatic assignment to HTMLInputElement.files
+            }
             handleFileSelection(dt.files[0]);
         }
     });
