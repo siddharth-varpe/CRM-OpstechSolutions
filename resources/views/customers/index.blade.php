@@ -376,6 +376,34 @@
                     </div>
                 </div>
 
+                <!-- Column Mapping Selector -->
+                <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-sky-600"></i>
+                            Column Mapping
+                        </span>
+                        <span class="text-[10px] text-slate-500">Auto-detected. Adjust if needed:</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-1">Customer Name *</label>
+                            <select id="mapColName" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500">
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-1">Phone / Mobile *</label>
+                            <select id="mapColNumber" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500">
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 mb-1">Address (Optional)</label>
+                            <select id="mapColAddress" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500">
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Mapping Status Banner -->
                 <div class="p-3 rounded-xl bg-sky-50 border border-sky-200 text-xs text-sky-800 flex items-start gap-2">
                     <i data-lucide="check-circle-2" class="w-4 h-4 text-sky-600 shrink-0 mt-0.5"></i>
@@ -383,7 +411,7 @@
                         <span class="font-bold">Columns verified:</span> 
                         <span id="repColNames">Name, Number, Address</span>.
                         <div class="text-[11px] text-sky-700 mt-0.5">
-                            Any rows with missing name, phone, or address will be preserved as empty records during import.
+                            Any rows with missing name, phone, or address will be preserved safely as empty records during import.
                         </div>
                     </div>
                 </div>
@@ -409,6 +437,20 @@
                                 <!-- Populated dynamically by JS -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Progress Bar Container -->
+                <div id="importProgressBarContainer" class="hidden space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div class="flex items-center justify-between text-xs text-slate-700 font-bold">
+                        <span id="importProgressText" class="flex items-center gap-1.5">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-sky-600"></i>
+                            Importing customers...
+                        </span>
+                        <span id="importProgressPercent" class="font-mono text-sky-700 font-extrabold">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                        <div id="importProgressBar" class="bg-primary-600 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
                     </div>
                 </div>
 
@@ -448,6 +490,7 @@
 <script>
 let currentImportFile = null;
 let analyzedImportRows = [];
+let currentReportData = null;
 
 function openCustomerImportModal() {
     resetCustomerImportModal();
@@ -457,6 +500,7 @@ function openCustomerImportModal() {
 function resetCustomerImportModal() {
     currentImportFile = null;
     analyzedImportRows = [];
+    currentReportData = null;
     $('#inputImportFile').val('');
     $('#selectedFileInfo').addClass('hidden');
     $('#selectedFileName').text('');
@@ -467,6 +511,10 @@ function resetCustomerImportModal() {
         .addClass('bg-slate-300 cursor-not-allowed');
     $('#btnAnalyzeFileText').text('Analyze File');
     $('#btnExecuteFinalImport').prop('disabled', false);
+
+    $('#importProgressBarContainer').addClass('hidden');
+    $('#importProgressBar').css('width', '0%');
+    $('#importProgressPercent').text('0%');
 
     $('#importStepUpload').removeClass('hidden');
     $('#importStepReport').addClass('hidden');
@@ -515,6 +563,9 @@ $(document).ready(function() {
         $drop.removeClass('border-sky-500 bg-sky-50/50');
     });
     $drop.on('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $drop.removeClass('border-sky-500 bg-sky-50/50');
         const dt = e.originalEvent.dataTransfer;
         if (dt && dt.files && dt.files.length) {
             handleFileSelection(dt.files[0]);
@@ -588,6 +639,7 @@ $(document).ready(function() {
     });
 
     function renderAnalysisReport(report) {
+        currentReportData = report;
         analyzedImportRows = report.rows || [];
         
         $('#repTotalRows').text(report.total_rows);
@@ -598,13 +650,46 @@ $(document).ready(function() {
             $('#repColNames').text(`${report.columns.name_header}, ${report.columns.number_header}, ${report.columns.address_header}`);
         }
 
-        const previewList = report.preview || [];
-        let rowsHtml = '';
+        // Populate Column Mapping Dropdowns
+        const headers = report.headers || [];
+        const detected = report.detected_cols || { name: 0, number: 1, address: -1 };
 
+        let nameOptions = '';
+        let numOptions = '';
+        let addrOptions = '<option value="-1">None (Leave Address Empty)</option>';
+
+        headers.forEach(function(h) {
+            const isNameSel = h.index === detected.name ? 'selected' : '';
+            const isNumSel = h.index === detected.number ? 'selected' : '';
+            const isAddrSel = h.index === detected.address ? 'selected' : '';
+
+            nameOptions += `<option value="${h.index}" ${isNameSel}>Col ${h.index + 1}: ${h.name}</option>`;
+            numOptions += `<option value="${h.index}" ${isNumSel}>Col ${h.index + 1}: ${h.name}</option>`;
+            addrOptions += `<option value="${h.index}" ${isAddrSel}>Col ${h.index + 1}: ${h.name}</option>`;
+        });
+
+        $('#mapColName').html(nameOptions);
+        $('#mapColNumber').html(numOptions);
+        $('#mapColAddress').html(addrOptions);
+
+        renderPreviewTable(report.preview || [], report.total_rows);
+
+        $('#btnFinalImportText').text(`Final Import (${report.total_rows} Customers)`);
+
+        $('#importStepUpload').addClass('hidden');
+        $('#importStepReport').removeClass('hidden');
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    function renderPreviewTable(previewList, totalCount) {
+        let rowsHtml = '';
         previewList.forEach(function(row) {
-            const nameHtml = row.name ? `<span class="font-bold text-slate-900">${row.name}</span>` : `<span class="text-slate-400 italic">Empty</span>`;
-            const phoneHtml = row.number ? `<span class="font-mono text-slate-700">${row.number}</span>` : `<span class="text-slate-400 italic">Empty</span>`;
-            const addressHtml = row.address ? `<span class="text-slate-700 line-clamp-1">${row.address}</span>` : `<span class="text-slate-400 italic">Empty</span>`;
+            const nameHtml = row.name ? `<span class="font-bold text-slate-900">${escapeHtml(row.name)}</span>` : `<span class="text-slate-400 italic">Empty</span>`;
+            const phoneHtml = row.number ? `<span class="font-mono text-slate-700">${escapeHtml(row.number)}</span>` : `<span class="text-slate-400 italic">Empty</span>`;
+            const addressHtml = row.address ? `<span class="text-slate-700 line-clamp-1">${escapeHtml(row.address)}</span>` : `<span class="text-slate-400 italic">Empty</span>`;
             
             let badgeHtml = '';
             if (row.status === 'COMPLETE') {
@@ -626,59 +711,125 @@ $(document).ready(function() {
         });
 
         $('#repPreviewTableBody').html(rowsHtml);
-        $('#repPreviewCount').text(`Showing ${previewList.length} of ${report.total_rows} records`);
-
-        $('#btnFinalImportText').text(`Final Import (${report.total_rows} Customers)`);
-
-        $('#importStepUpload').addClass('hidden');
-        $('#importStepReport').removeClass('hidden');
-
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
+        $('#repPreviewCount').text(`Showing ${previewList.length} of ${totalCount} records`);
     }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Trigger re-analysis when user modifies Column Mapping dropdowns
+    $('#mapColName, #mapColNumber, #mapColAddress').on('change', function() {
+        if (!currentImportFile) return;
+
+        const formData = new FormData();
+        formData.append('file', currentImportFile);
+        formData.append('name_col', $('#mapColName').val());
+        formData.append('number_col', $('#mapColNumber').val());
+        formData.append('address_col', $('#mapColAddress').val());
+        formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
+
+        $('#repPreviewTableBody').html('<tr><td colspan="5" class="py-4 text-center text-slate-400"><i data-lucide="loader-2" class="w-4 h-4 animate-spin inline mr-1"></i> Updating preview...</td></tr>');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        $.ajax({
+            url: "{{ route('customers.import.analyze') }}",
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                if (res.success && res.report) {
+                    analyzedImportRows = res.report.rows || [];
+                    $('#repTotalRows').text(res.report.total_rows);
+                    $('#repCompleteRows').text(res.report.complete_count);
+                    $('#repPartialRows').text(res.report.partial_count);
+                    if (res.report.columns) {
+                        $('#repColNames').text(`${res.report.columns.name_header}, ${res.report.columns.number_header}, ${res.report.columns.address_header}`);
+                    }
+                    renderPreviewTable(res.report.preview || [], res.report.total_rows);
+                    $('#btnFinalImportText').text(`Final Import (${res.report.total_rows} Customers)`);
+                }
+            }
+        });
+    });
 });
 
-// Step 2: Final Import Commit Click
-function executeFinalImport() {
+// Step 2: Final Import Commit Click with chunking & live progress bar
+async function executeFinalImport() {
     if (!analyzedImportRows || analyzedImportRows.length === 0) {
         showToast('No customer records to import.', 'danger');
         return;
     }
 
     const $btn = $('#btnExecuteFinalImport');
-    $btn.prop('disabled', true);
-    $('#btnFinalImportText').html('<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline mr-1"></i> Importing...');
-    if (typeof lucide !== 'undefined') lucide.createIcons();
+    const $btnText = $('#btnFinalImportText');
+    const $progressContainer = $('#importProgressBarContainer');
+    const $progressBar = $('#importProgressBar');
+    const $progressText = $('#importProgressText');
+    const $progressPercent = $('#importProgressPercent');
 
-    $.ajax({
-        url: "{{ route('customers.import.commit') }}",
-        type: 'POST',
-        data: JSON.stringify({
-            rows: analyzedImportRows,
-            _token: $('meta[name="csrf-token"]').attr('content')
-        }),
-        contentType: 'application/json',
-        dataType: 'json',
-        success: function(res) {
-            if (res.success) {
-                $('#importStepReport').addClass('hidden');
-                $('#successImportMessage').text(res.message || `Successfully imported ${res.imported_count || analyzedImportRows.length} customers into the directory.`);
-                $('#importStepSuccess').removeClass('hidden');
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            } else {
+    $btn.prop('disabled', true);
+    $progressContainer.removeClass('hidden');
+
+    const total = analyzedImportRows.length;
+    const chunkSize = 1000;
+    let importedTotal = 0;
+
+    for (let i = 0; i < total; i += chunkSize) {
+        const chunk = analyzedImportRows.slice(i, i + chunkSize);
+        const currentBatch = Math.min(i + chunkSize, total);
+        const percent = Math.round((currentBatch / total) * 100);
+
+        $btnText.html(`<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline mr-1"></i> Importing (${currentBatch}/${total})...`);
+        $progressText.html(`<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline text-sky-600 mr-1.5"></i> Importing ${currentBatch} of ${total} customers...`);
+        $progressBar.css('width', `${percent}%`);
+        $progressPercent.text(`${percent}%`);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        try {
+            const res = await $.ajax({
+                url: "{{ route('customers.import.commit') }}",
+                type: 'POST',
+                data: JSON.stringify({
+                    rows: chunk,
+                    _token: $('meta[name="csrf-token"]').attr('content')
+                }),
+                contentType: 'application/json',
+                dataType: 'json'
+            });
+
+            if (!res.success) {
                 showToast(res.message || 'Error executing import.', 'danger');
                 $btn.prop('disabled', false);
-                $('#btnFinalImportText').text(`Final Import (${analyzedImportRows.length} Customers)`);
+                $btnText.text(`Final Import (${total} Customers)`);
+                return;
             }
-        },
-        error: function(xhr) {
+            importedTotal += (res.imported_count || chunk.length);
+        } catch (xhr) {
             const err = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Error executing final import.';
             showToast(err, 'danger');
             $btn.prop('disabled', false);
-            $('#btnFinalImportText').text(`Final Import (${analyzedImportRows.length} Customers)`);
+            $btnText.text(`Final Import (${total} Customers)`);
+            return;
         }
-    });
+    }
+
+    // Finished all batches successfully
+    $progressBar.css('width', '100%');
+    $progressPercent.text('100%');
+    $progressText.html('<i data-lucide="check" class="w-4 h-4 text-emerald-600 inline mr-1.5"></i> Done!');
+
+    $('#importStepReport').addClass('hidden');
+    $('#successImportMessage').text(`Successfully imported all ${importedTotal} customers into the directory.`);
+    $('#importStepSuccess').removeClass('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 </script>
 @endsection

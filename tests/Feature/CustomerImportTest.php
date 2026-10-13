@@ -188,9 +188,9 @@ class CustomerImportTest extends TestCase
      */
     public function test_analyze_excel_file(): void
     {
-        $xlsxPath = '/tmp/sample_customers.xlsx';
+        $xlsxPath = '/home/siddharth/Downloads/SR CST DATA.xlsx';
         if (file_exists($xlsxPath)) {
-            $file = new UploadedFile($xlsxPath, 'sample_customers.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+            $file = new UploadedFile($xlsxPath, 'SR CST DATA.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
 
             $response = $this->actingAs($this->user)->postJson(route('customers.import.analyze'), [
                 'file' => $file,
@@ -200,7 +200,67 @@ class CustomerImportTest extends TestCase
             $response->assertJson([
                 'success' => true,
             ]);
-            $this->assertGreaterThanOrEqual(1, $response->json('report.total_rows'));
+            $this->assertGreaterThanOrEqual(100, $response->json('report.total_rows'));
+            $this->assertArrayHasKey('headers', $response->json('report'));
+            $this->assertArrayHasKey('detected_cols', $response->json('report'));
         }
+    }
+
+    /**
+     * Test column mapping overrides during analyze.
+     */
+    public function test_column_mapping_override_during_analyze(): void
+    {
+        $csvContent = implode("\n", [
+            "ID,Full Address,Client Contact,Customer Name",
+            "1,\"Pune, Baner\",9822001122,Ramesh Kale",
+            "2,\"Aundh, Pune\",9822998877,Seema Joshi",
+        ]);
+
+        $file = UploadedFile::fake()->createWithContent('custom_columns.csv', $csvContent);
+
+        $response = $this->actingAs($this->user)->postJson(route('customers.import.analyze'), [
+            'file' => $file,
+            'name_col' => 3,    // Customer Name is col 3
+            'number_col' => 2,  // Client Contact is col 2
+            'address_col' => 1, // Full Address is col 1
+        ]);
+
+        $response->assertStatus(200);
+        $rows = $response->json('report.rows');
+        $this->assertEquals('Ramesh Kale', $rows[0]['name']);
+        $this->assertEquals('9822001122', $rows[0]['number']);
+        $this->assertEquals('Pune, Baner', $rows[0]['address']);
+        $this->assertEquals('COMPLETE', $rows[0]['status']);
+    }
+
+    /**
+     * Test large volume customer commit performance.
+     */
+    public function test_large_volume_customer_commit_performance(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 500; $i++) {
+            $rows[] = [
+                'name' => "Batch Customer {$i}",
+                'number' => '9800000' . str_pad((string)$i, 3, '0', STR_PAD_LEFT),
+                'address' => "Plot {$i}, Hinjawadi, Pune",
+            ];
+        }
+
+        $start = microtime(true);
+        $response = $this->actingAs($this->user)->postJson(route('customers.import.commit'), [
+            'rows' => $rows,
+        ]);
+        $duration = microtime(true) - $start;
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'imported_count' => 500,
+        ]);
+
+        // 500 rows should commit in less than 3 seconds
+        $this->assertLessThan(3.0, $duration, "500 rows took {$duration}s which is too slow");
     }
 }

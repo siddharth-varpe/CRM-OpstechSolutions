@@ -80,4 +80,74 @@ class BusinessSequence extends Model
             return "{$seq->prefix}-{$currentYear}-{$padded}";
         });
     }
+
+    /**
+     * Atomically reserve and generate multiple sequence numbers in bulk.
+     * High-performance method for importing or batch creation.
+     */
+    public static function nextNumbers(string $name, int $count, ?string $customPrefix = null, int $padding = 4): array
+    {
+        if ($count <= 0) {
+            return [];
+        }
+
+        return DB::transaction(function () use ($name, $count, $customPrefix, $padding) {
+            $aliasMap = [
+                'JOBCARD' => 'JOB_CARD',
+            ];
+            $seqName = $aliasMap[strtoupper($name)] ?? strtoupper($name);
+
+            $defaultPrefixes = [
+                'CUSTOMER' => 'CUST',
+                'INVOICE' => 'INV',
+                'SALE' => 'SALE',
+                'SERVICE' => 'SRV',
+                'JOB_CARD' => 'JC',
+                'PAYMENT' => 'PAY',
+                'WARRANTY' => 'WAR',
+                'ASSET' => 'ASSET',
+                'INQUIRY' => 'INQ',
+                'RENTAL' => 'RNT',
+                'REMINDER' => 'REM',
+            ];
+
+            $currentYear = (int) date('Y');
+            $seq = self::lockForUpdate()->find($seqName);
+
+            if (!$seq) {
+                $prefix = $customPrefix ?? ($defaultPrefixes[$seqName] ?? $seqName);
+                $seq = self::create([
+                    'name' => $seqName,
+                    'prefix' => $prefix,
+                    'current_val' => $count,
+                    'padding' => $padding,
+                    'year_reset' => true,
+                    'current_year' => $currentYear,
+                ]);
+                $startCounter = 1;
+            } else {
+                if ($seq->year_reset && $seq->current_year < $currentYear) {
+                    $startCounter = 1;
+                    $seq->current_val = $count;
+                    $seq->current_year = $currentYear;
+                } else {
+                    $startCounter = $seq->current_val + 1;
+                    $seq->current_val += $count;
+                }
+                if ($customPrefix !== null) {
+                    $seq->prefix = $customPrefix;
+                }
+                $seq->save();
+            }
+
+            $padLen = $seq->padding > 0 ? $seq->padding : 4;
+            $numbers = [];
+            for ($i = 0; $i < $count; $i++) {
+                $val = $startCounter + $i;
+                $padded = str_pad((string) $val, $padLen, '0', STR_PAD_LEFT);
+                $numbers[] = "{$seq->prefix}-{$currentYear}-{$padded}";
+            }
+            return $numbers;
+        });
+    }
 }
