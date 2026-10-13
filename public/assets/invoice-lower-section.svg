@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2349 520" width="2349" height="520" style="background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
+  <!-- Outer Border & Background -->
+  <rect x="0" y="0" width="2349" height="520" fill="#ffffff"/>
+
+  <!-- Column 1: Bank Details (0 to 610) -->
+  <g transform="translate(35, 45)">
+    <text x="0" y="0" font-size="36" font-weight="bold" fill="#000000">Bank Details</text>
+    <text x="0" y="65" font-size="32" fill="#111827"><tspan font-weight="bold">Bank:</tspan> State Bank of India</text>
+    <text x="0" y="125" font-size="32" fill="#111827"><tspan font-weight="bold">Name:</tspan> Enterprises CRM</text>
+    <text x="0" y="185" font-size="32" fill="#111827"><tspan font-weight="bold">A/c No:</tspan> 30998877665</text>
+    <text x="0" y="245" font-size="32" fill="#111827"><tspan font-weight="bold">IFSC:</tspan> SBIN0001234</text>
+    <text x="0" y="305" font-size="32" fill="#111827"><tspan font-weight="bold">Branch:</tspan> Main Branch, Pune</text>
+  </g>
+  <line x1="610" y1="0" x2="610" y2="520" stroke="#000000" stroke-width="3.5"/>
+
+  <!-- Column 2: Payment QR Code (610 to 1175) -->
+  <g transform="translate(640, 45)">
+    <text x="0" y="0" font-size="36" font-weight="bold" fill="#000000">Payment QR Code</text>
+    <text x="0" y="50" font-size="28" fill="#374151">Scan &amp; Pay (UPI)</text>
+    <text x="0" y="90" font-size="26" font-weight="bold" fill="#111827">UPI: enterprises.crm@upi</text>
+    <!-- Scaled QR Code -->
+    <g transform="translate(60, 110) scale(8.5)">
+      <path fill="#ffffff" d="M0 0h41v41H0z"/><path stroke="#000000" d="M4 4.5h7m2 0h3m1 0h2m1 0h2m1 0h3m1 0h1m2 0h7M4 5.5h1m5 0h1m2 0h1m2 0h4m4 0h1m5 0h1m5 0h1M4 6.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m5 0h2m3 0h1m1 0h3m1 0h1M4 7.5h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h2m1 0h3m2 0h2m2 0h1m1 0h3m1 0h1M4 8.5h1m1 0h3m1 0h1m1 0h1m1 0h2m3 0h1m2 0h1m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1M4 9.5h1m5 0h1m1 0h2m1 0h1m2 0h2m1 0h2m2 0h2m3 0h1m5 0h1M4 10.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M12 11.5h2m1 0h1m2 0h1m4 0h1m1 0h2m1 0h1M4 12.5h1m1 0h5m2 0h1m2 0h4m1 0h1m4 0h2m2 0h5M4 13.5h2m1 0h3m1 0h6m1 0h3m1 0h4m1 0h2m1 0h1m3 0h3M5 14.5h2m2 0h2m1 0h2m1 0h2m2 0h3m3 0h2m2 0h1m1 0h1m2 0h2M4 15.5h1m2 0h3m3 0h1m1 0h2m1 0h3m1 0h2m1 0h2m1 0h1m2 0h1m1 0h2m1 0h1M4 16.5h1m1 0h2m1 0h3m2 0h1m1 0h1m3 0h2m2 0h1m1 0h1m1 0h2m2 0h1m2 0h1M4 17.5h1m6 0h3m2 0h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h1m3 0h3M5 18.5h2m2 0h2m2 0h1m4 0h2m4 0h1m1 0h1m1 0h1m2 0h2m1 0h2M4 19.5h1m1 0h1m2 0h1m1 0h3m1 0h3m2 0h1m2 0h1m1 0h1m1 0h3m2 0h4M4 20.5h1m1 0h1m2 0h2m7 0h1m2 0h1m2 0h1m1 0h1m1 0h2m2 0h1m2 0h1M7 21.5h3m2 0h2m1 0h2m3 0h1m2 0h5m1 0h2m5 0h1M5 22.5h4m1 0h2m3 0h3m1 0h1m1 0h2m5 0h2m2 0h3M4 23.5h1m1 0h1m1 0h2m1 0h2m3 0h1m8 0h2m1 0h2m2 0h1m1 0h2M4 24.5h1m1 0h7m3 0h1m2 0h1m1 0h1m7 0h1m1 0h3m2 0h1M4 25.5h2m5 0h2m1 0h1m1 0h5m3 0h2m1 0h1m1 0h2m2 0h1m1 0h2M4 26.5h1m1 0h3m1 0h3m2 0h8m2 0h2m1 0h1m1 0h1m4 0h1M4 27.5h1m2 0h3m1 0h2m1 0h1m1 0h1m1 0h2m5 0h1m2 0h2m4 0h1M4 28.5h1m5 0h1m2 0h1m2 0h2m2 0h3m1 0h1m1 0h1m1 0h6m1 0h2M12 29.5h1m2 0h3m2 0h1m1 0h4m1 0h2m3 0h1m3 0h1M4 30.5h7m6 0h4m4 0h4m1 0h1m1 0h1m2 0h1M4 31.5h1m5 0h1m1 0h1m4 0h1m5 0h1m1 0h4m3 0h1m1 0h1M4 32.5h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h2m1 0h2m1 0h1m3 0h5M4 33.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h6m1 0h1m1 0h3m3 0h3m1 0h2M4 34.5h1m1 0h3m1 0h1m1 0h1m1 0h1m3 0h4m3 0h3m1 0h3m1 0h2M4 35.5h1m5 0h1m2 0h3m3 0h2m1 0h2m1 0h3m4 0h3M4 36.5h7m1 0h1m1 0h1m1 0h3m2 0h1m2 0h1m1 0h3m1 0h1m1 0h1m1 0h2"/>
+    </g>
+  </g>
+  <line x1="1175" y1="0" x2="1175" y2="520" stroke="#000000" stroke-width="3.5"/>
+
+  <!-- Column 3: Terms and Conditions (1175 to 1860) -->
+  <g transform="translate(1205, 45)">
+    <text x="0" y="0" font-size="36" font-weight="bold" fill="#000000">Terms and Conditions</text>
+    <text x="0" y="60" font-size="27" fill="#1f2937">1) Goods once sold will not be taken back or exchanged.</text>
+    <text x="0" y="115" font-size="27" fill="#1f2937">2) Warranty as per manufacturer terms and conditions.</text>
+    <text x="0" y="170" font-size="27" fill="#1f2937">3) Service charges applicable for out-of-warranty services.</text>
+    <text x="0" y="225" font-size="27" fill="#1f2937">4) Subject to local jurisdiction.</text>
+    <text x="0" y="280" font-size="27" fill="#1f2937">5) Payment due immediately or as per agreed terms.</text>
+    <text x="0" y="335" font-size="27" fill="#1f2937">6) Disputes, if any, subject to local court jurisdiction.</text>
+  </g>
+  <line x1="1860" y1="0" x2="1860" y2="520" stroke="#000000" stroke-width="3.5"/>
+
+  <!-- Column 4: Authorised Signatory (1860 to 2349) -->
+  <g transform="translate(1885, 30)">
+    <!-- Signature Graphic -->
+    <g transform="translate(80, 110)">
+      <path d="M 40 70 C 30 35 45 15 65 12 C 85 9 95 27 90 48 C 86 63 65 69 50 68 C 76 65 104 42 116 24 C 126 12 140 12 148 21 C 154 33 150 54 136 68 M 104 36 C 124 27 144 30 164 42 C 176 51 188 54 204 54 M 136 66 C 164 65 210 60 256 57" fill="none" stroke="#000000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="240" y="360" font-size="29" font-weight="bold" fill="#000000" text-anchor="middle">Authorised Signatory For</text>
+    <text x="240" y="410" font-size="32" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="1">ENTERPRISES CRM</text>
+  </g>
+</svg>

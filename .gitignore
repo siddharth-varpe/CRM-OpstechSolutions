@@ -1,68 +1,37 @@
-# Node & Package Managers
-node_modules/
-.pnpm-store/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Environment & Secrets
-.env
-.env.*
-!.env.example
-maps_credentials.md
-
-# Build Outputs & Bundles
-dist/
-build/
-out/
-graphify-out/
-.next/
-.turbo/
-*.tsbuildinfo
-
-# Drizzle & DB artifacts
-drizzle/meta/
-.drizzle/
-
-# Testing & Coverage
-coverage/
-.nyc_output/
-test-results/
-playwright-report/
-blob-report/
-playwright/.cache/
-
-# Logs & Temporary Files
-logs/
 *.log
-*.tmp
-*.temp
 .DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
 Thumbs.db
-
-# IDE & Editor files
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-.idea/
-*.suo
-*.ntvs*
-# Embedded database & local data
-.crm-data/
-apps/api/.crm-data/
-scratch/
-cookies.txt
-scripts/mailer/outbox/
-D:/
-
-# Production SSL certs and Database backups
-infrastructure/nginx/certs/*.crt
-infrastructure/nginx/certs/*.key
-infrastructure/nginx/certs/*.pem
-backups/
-*.sql.gz
-*.sql.gz.sha256
-.directory
-
+*.sqlite*
+*cookies.txt
+.env.laravel*
+maps_credentials.md
+maps_failure.md
+.legacy_monorepo/
+graphify-out/
+/D:
+/scripts/mailer/outbox/
+/scripts/bin/

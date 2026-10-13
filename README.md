@@ -1,152 +1,58 @@
-# SR ENTERPRISES CRM
+<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-Commercial-grade, security-conscious, scalable SaaS for RO water purifier sales, spare-parts sales, RO repair, and home-service business operations.
+<p align="center">
+<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+</p>
 
----
+## About Laravel
 
-## 📖 Authoritative Project Documents
+Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
 
-The master product and flow specifications for this system are:
+- [Simple, fast routing engine](https://laravel.com/docs/routing).
+- [Powerful dependency injection container](https://laravel.com/docs/container).
+- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
+- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
+- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
+- [Robust background job processing](https://laravel.com/docs/queues).
+- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
-1. [`PRODUCT_REQUIREMENTS.txt`](./PRODUCT_REQUIREMENTS.txt) — WHAT the product contains (Product & Engineering Requirements).
-2. [`AppFlow.md`](./AppFlow.md) — HOW users and business workflows move through the system (User Journey & Application Flow).
+Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
-*These two documents are authoritative and govern all architectural and domain implementations.*
+## Learning Laravel
 
----
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
 
-## 🏛️ Architecture Overview
+In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
 
-```
-SR-Enterprises-CRM (Monorepo)
-├── apps/
-│   ├── web/                     # React + TypeScript + Vite + Tailwind CSS + PWA
-│   └── api/                     # Node.js + TypeScript + Fastify
-│
-├── packages/
-│   ├── shared/                  # Common constants, error codes, HTTP status mappings
-│   ├── types/                   # Shared TypeScript domain contracts, RBAC roles & API DTOs
-│   ├── validation/              # Shared Zod validation schemas
-│   └── config/                  # Shared TypeScript/ESLint base configurations
-│
-├── infrastructure/
-│   └── docker/                  # Docker compose & container configurations
-│
-├── tests/
-│   └── e2e/                     # Playwright end-to-end tests
-│
-├── .github/
-│   └── workflows/ci.yml         # GitHub Actions CI quality gates
-│
-├── pnpm-workspace.yaml          # Workspace configuration
-├── package.json                 # Unified monorepo runner scripts
-├── docker-compose.yml           # Local PostgreSQL 18 & Redis services
-└── .env.example                 # Environment variables specification
-```
+You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
 
----
+## Agentic Development
 
-## 🚀 Approved Technology Stack
-
-| Layer | Technologies |
-| :--- | :--- |
-| **Frontend** | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Lucide, Apache ECharts, Zustand, TanStack Query, React Hook Form, Zod |
-| **PWA** | Vite PWA / Service Worker, Web App Manifest, Standalone Desktop Experience |
-| **Backend** | Node.js, TypeScript, Fastify |
-| **Database** | PostgreSQL 18 with Drizzle ORM |
-| **Cache / Queue** | Redis + BullMQ |
-| **Realtime** | Socket.IO |
-| **Security** | Argon2id password hashing, Secure HTTP-only cookies, Rate limiting, Request correlation (`X-Request-ID`), Centralized error sanitization |
-| **Testing** | Vitest, React Testing Library, Playwright |
-| **CI / CD** | GitHub Actions |
-| **Package Manager** | `pnpm` |
-
----
-
-## 🛠️ Getting Started
-
-### Prerequisites
-
-- **Node.js** >= 20 (Node.js 22/24 LTS recommended)
-- **pnpm** >= 9
-- **Docker Desktop** (for local PostgreSQL 18 and Redis)
-- **Git**
-
-### 1. Clone & Setup Environment
+Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd CRM-SR-Enterprices
+composer require laravel/boost --dev
 
-# Copy environment variables template
-cp .env.example .env
+php artisan boost:install
 ```
 
-### 2. Start Infrastructure Containers
+Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
-```bash
-# Start PostgreSQL 18 & Redis
-pnpm docker:up
-```
+## Contributing
 
-### 3. Install Dependencies
+Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-```bash
-# Install workspace dependencies
-pnpm install
-```
+## Code of Conduct
 
-### 4. Run Development Servers
+In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-```bash
-# Run both Frontend (port 3000) and Backend (port 4000) concurrently
-pnpm dev
+## Security Vulnerabilities
 
-# Or run services individually:
-pnpm dev:api   # Fastify API (http://localhost:4000)
-pnpm dev:web   # React Vite App (http://localhost:3000)
-```
+If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
 
----
+## License
 
-## 📋 Developer Commands
-
-| Command | Description |
-| :--- | :--- |
-| `pnpm dev` | Starts all monorepo applications in development mode |
-| `pnpm build` | Builds all packages and applications in topological order |
-| `pnpm test` | Runs Vitest across all apps and packages |
-| `pnpm test:e2e` | Runs Playwright end-to-end tests |
-| `pnpm lint` | Runs ESLint / type linters across workspace |
-| `pnpm typecheck` | Validates TypeScript types across workspace without emitting code |
-| `pnpm format` | Checks Prettier formatting across the codebase |
-| `pnpm format:write` | Formats all source files with Prettier |
-| `pnpm docker:up` | Starts local PostgreSQL 18 and Redis containers |
-| `pnpm docker:down` | Stops local containers |
-
----
-
-## 🔍 Health & Observability Endpoints
-
-| Endpoint | Method | Purpose |
-| :--- | :--- | :--- |
-| `/health` | `GET` | **Liveness Probe**: Confirms API process is alive and responsive |
-| `/ready` | `GET` | **Readiness Probe**: Confirms active connection to PostgreSQL 18 and Redis |
-| `/api/v1` | `GET` | **API Root**: Base router for version 1 API endpoints |
-
----
-
-## 🛡️ Security & Quality Standards
-
-- **Centralized Error Handling**: Production error responses never leak stack traces, database credentials, or raw SQL syntax.
-- **Fail-Fast Configuration**: Fastify backend crashes with an explicit diagnostic message if required production environment variables are invalid.
-- **Argon2id Hashing**: Industry standard memory-hard password hashing.
-- **Strict TypeScript**: `noImplicitAny`, `strictNullChecks`, `exactOptionalPropertyTypes`, and zero unmanaged `any` casts.
-- **Offline-Aware UX**: Real-time tracking of network connectivity (`connected`, `connecting`, `offline`, `syncing`).
-
----
-
-## 📍 Next Phase
-
-- **PHASE 1** — Database Architecture & Domain Model (PostgreSQL 18 Drizzle Schemas, Migrations, Constraints, Transactions, and Domain Repositories).
+The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
