@@ -100,10 +100,13 @@
                         <span class="font-bold text-slate-900 truncate text-xs" id="routeTechName">Technician</span>
                         <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono shrink-0">NAVIGATING</span>
                     </div>
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-1.5">
                         <button type="button" onclick="focusCurrentRoute()" class="text-[11px] font-bold text-sky-600 hover:text-sky-800 hover:underline flex items-center gap-1 cursor-pointer shrink-0" title="Fit route in view">
                             <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
                             <span>Focus</span>
+                        </button>
+                        <button type="button" onclick="closeRouteBanner()" class="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer" title="Close directions">
+                            <i data-lucide="x" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
@@ -245,6 +248,8 @@ let observedBreadcrumbMarkers = [];
 let liveObservedTrails = {};
 let currentRouteSteps = [];
 let isTurnByTurnOpen = true;
+let isRouteBannerOpenByUser = false;
+let activeRouteBannerTechId = null;
 
 const PUNE_CENTER = { lat: 18.5204, lng: 73.8567 };
 
@@ -459,7 +464,9 @@ function renderTechnicianCards() {
                 </div>
 
                 ${isLive && t.customerName ? `
-                    <div class="mt-2.5 pt-2 border-t border-slate-100 text-[11px] space-y-1 bg-slate-50/70 p-2 rounded-lg">
+                    <div onclick="event.stopPropagation(); openDestinationRouteBanner('${t.technicianId}');"
+                         class="mt-2.5 pt-2 border-t border-slate-100 text-[11px] space-y-1 bg-slate-50/70 hover:bg-slate-100/90 p-2 rounded-lg cursor-pointer transition border border-transparent hover:border-slate-200"
+                         title="Click to view destination turn-by-turn route">
                         <div class="flex items-center justify-between text-slate-800 font-semibold">
                             <span class="truncate flex items-center gap-1">
                                 <i data-lucide="map-pin" class="w-3 h-3 text-rose-500 shrink-0"></i>
@@ -613,9 +620,10 @@ function updateGoogleMapElements(technicians) {
                 destMarkers[techId] = dm;
             }
 
-            // Ensure click listener opens destination description info window
+            // Ensure click listener opens destination route banner and info window
             google.maps.event.clearListeners(destMarkers[techId], 'click');
             destMarkers[techId].addListener('click', function() {
+                openDestinationRouteBanner(techId);
                 showDestinationInfoWindow(techId);
             });
         } else if (destMarkers[techId]) {
@@ -897,6 +905,8 @@ function clearActiveRouteVisuals() {
     lastRenderedRouteKey = null;
     currentRouteBounds = null;
     lastRenderedRouteTechId = null;
+    isRouteBannerOpenByUser = false;
+    activeRouteBannerTechId = null;
     $('#activeRouteBanner').addClass('hidden');
     $('#turnByTurnContainer').addClass('hidden');
     $('#routeNextManeuverBox').addClass('hidden');
@@ -904,7 +914,9 @@ function clearActiveRouteVisuals() {
 }
 
 function applyRouteTelemetry(tech, distText, etaText, destAddress) {
-    $('#activeRouteBanner').removeClass('hidden');
+    if (isRouteBannerOpenByUser && activeRouteBannerTechId === tech.technicianId) {
+        $('#activeRouteBanner').removeClass('hidden');
+    }
     $('#routeTechName').text(tech.technicianName);
     $('#routeCustomerName').text(tech.customerName || 'Customer');
     $('#routeCustomerAddress').text(destAddress || tech.customerAddress || 'Customer Premise');
@@ -1206,6 +1218,31 @@ function fitAllMarkers() {
         mapInstance.setCenter(PUNE_CENTER);
         mapInstance.setZoom(12);
     }
+}
+
+function openDestinationRouteBanner(techId) {
+    const tech = allTechniciansData.find(t => t.technicianId === techId);
+    if (!tech) return;
+
+    isRouteBannerOpenByUser = true;
+    activeRouteBannerTechId = techId;
+
+    $('#routeTechName').text(tech.technicianName);
+    $('#routeCustomerName').text(tech.customerName || 'Customer');
+    $('#routeCustomerAddress').text(tech.customerAddress || 'Customer Premise');
+    if (tech.distanceKm) $('#routeDistance').text(tech.distanceKm + ' km');
+    if (tech.etaMinutes) $('#routeEta').text('ETA: ~' + tech.etaMinutes + 'm');
+
+    updateRouteForTechnician(tech);
+    $('#activeRouteBanner').removeClass('hidden');
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeRouteBanner() {
+    isRouteBannerOpenByUser = false;
+    activeRouteBannerTechId = null;
+    $('#activeRouteBanner').addClass('hidden');
 }
 
 function escapeHtml(str) {
