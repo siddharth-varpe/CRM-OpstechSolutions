@@ -21,7 +21,7 @@
                 <a href="{{ route('technicians.index') }}"
                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-900">
                     <i data-lucide="users" class="w-3.5 h-3.5 text-slate-500"></i>
-                    <span>Roster Directory</span>
+                    <span>Technician</span>
                 </a>
                 <a href="{{ route('technicians.map') }}"
                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-white text-slate-900 shadow-2xs border border-slate-200/80">
