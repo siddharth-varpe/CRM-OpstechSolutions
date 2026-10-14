@@ -410,47 +410,35 @@ class CustomerController extends Controller
     public function geocodeAddress(Request $request)
     {
         $query = trim((string)$request->input('query', $request->input('address', '')));
-        if (empty($query)) {
+        $landmark = trim((string)$request->input('landmark', ''));
+        $area = trim((string)$request->input('area', $request->input('address_line2', '')));
+        $city = trim((string)$request->input('city', 'Pune'));
+
+        if (empty($query) && empty($landmark) && empty($area)) {
             return response()->json(['success' => false, 'message' => 'Address query is required'], 422);
         }
 
-        $cacheKey = 'geocode:' . md5(strtolower($query));
+        $cacheKey = 'geocode:' . md5(strtolower($query . '|' . $landmark . '|' . $area . '|' . $city));
         $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
         if ($cached) {
             return response()->json($cached);
         }
 
-        $candidates = $this->buildGeocodeCandidates($query);
         $allMatches = [];
 
+        // LAYER 1: Search CRM verified knowledge base (exact buildings/societies previously pinned)
+        $fullSearchString = trim($query . ' ' . $landmark . ' ' . $area);
+        $crmMatches = $this->searchVerifiedCrmAddresses($fullSearchString);
+        foreach ($crmMatches as $cm) {
+            $allMatches[] = $cm;
+        }
+
+        // LAYER 2: Candidate decomposition including landmark and area
+        $candidates = $this->buildGeocodeCandidates($query, $landmark, $area, $city);
+
+        // Query Photon first for fine-grained landmarks, roads, and places (with Pune coordinate bias), then Nominatim
         foreach ($candidates as $candidate) {
-            // 1. Try Nominatim (OpenStreetMap)
-            try {
-                $response = \Illuminate\Support\Facades\Http::withHeaders([
-                    'User-Agent' => 'EnterprisesCRM/1.0',
-                ])->timeout(2.5)->get('https://nominatim.openstreetmap.org/search', [
-                    'q' => $candidate,
-                    'format' => 'json',
-                    'limit' => 3,
-                ]);
-
-                if ($response->successful() && !empty($response->json())) {
-                    foreach ($response->json() as $item) {
-                        $allMatches[] = [
-                            'latitude' => (float) $item['lat'],
-                            'longitude' => (float) $item['lon'],
-                            'display_name' => $item['display_name'] ?? $candidate,
-                            'matched_term' => $candidate,
-                            'type' => $item['type'] ?? 'place',
-                        ];
-                    }
-                    break; // Stop after highest-priority candidate with direct match
-                }
-            } catch (\Throwable $e) {
-                // Continue to Photon or next candidate
-            }
-
-            // 2. Try Photon (Komoot OSM Geocoder with Pune coordinate bias)
+            // 1. Try Photon (Komoot OSM Geocoder with Pune coordinate bias)
             try {
                 $photonRes = \Illuminate\Support\Facades\Http::timeout(2.5)
                     ->get('https://photon.komoot.io/api/', [
@@ -471,30 +459,69 @@ class CustomerController extends Controller
                                 $props['district'] ?? null,
                                 $props['locality'] ?? null,
                                 $props['city'] ?? null,
-                                $props['state'] ?? null,
                             ]);
                             $displayName = !empty($nameParts) ? implode(', ', $nameParts) : ($props['name'] ?? $candidate);
+                            $rawType = $props['type'] ?? ($props['osm_value'] ?? 'place');
 
                             $allMatches[] = [
                                 'latitude' => (float) $coords[1],
                                 'longitude' => (float) $coords[0],
                                 'display_name' => $displayName,
                                 'matched_term' => $candidate,
-                                'type' => $props['type'] ?? ($props['osm_value'] ?? 'place'),
+                                'type' => $rawType,
+                                'accuracy' => $this->classifyAccuracy($rawType),
                             ];
                         }
                     }
-                    if (!empty($allMatches)) {
+                    if (count($allMatches) >= 4) {
                         break;
                     }
                 }
             } catch (\Throwable $e) {
                 // Continue
             }
+
+            // 2. Try Nominatim (OpenStreetMap)
+            try {
+                $response = \Illuminate\Support\Facades\Http::withHeaders([
+                    'User-Agent' => 'EnterprisesCRM/1.0',
+                ])->timeout(2.5)->get('https://nominatim.openstreetmap.org/search', [
+                    'q' => $candidate,
+                    'format' => 'json',
+                    'limit' => 3,
+                ]);
+
+                if ($response->successful() && !empty($response->json())) {
+                    foreach ($response->json() as $item) {
+                        $rawType = $item['type'] ?? 'place';
+                        $allMatches[] = [
+                            'latitude' => (float) $item['lat'],
+                            'longitude' => (float) $item['lon'],
+                            'display_name' => $item['display_name'] ?? $candidate,
+                            'matched_term' => $candidate,
+                            'type' => $rawType,
+                            'accuracy' => $this->classifyAccuracy($rawType),
+                        ];
+                    }
+                    if (count($allMatches) >= 4) {
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Continue to next candidate
+            }
         }
 
         if (!empty($allMatches)) {
-            // Deduplicate proximate coordinates
+            // Sort matches: 'exact' (CRM building) > 'high' (landmark / street within +-100m) > 'approximate' (suburb centroid)
+            $rankMap = ['exact' => 1, 'high' => 2, 'approximate' => 3];
+            usort($allMatches, function ($a, $b) use ($rankMap) {
+                $rankA = $rankMap[$a['accuracy'] ?? 'approximate'] ?? 3;
+                $rankB = $rankMap[$b['accuracy'] ?? 'approximate'] ?? 3;
+                return $rankA <=> $rankB;
+            });
+
+            // Deduplicate proximate coordinates (< 50 meters apart)
             $uniqueMatches = [];
             foreach ($allMatches as $match) {
                 $isDup = false;
@@ -517,8 +544,9 @@ class CustomerController extends Controller
                 'longitude' => $primary['longitude'],
                 'display_name' => $primary['display_name'],
                 'matched_term' => $primary['matched_term'],
-                'is_approximate' => true,
-                'results' => array_slice($uniqueMatches, 0, 5),
+                'accuracy' => $primary['accuracy'] ?? 'approximate',
+                'is_approximate' => ($primary['accuracy'] ?? '') !== 'exact',
+                'results' => array_slice($uniqueMatches, 0, 6),
             ];
 
             \Illuminate\Support\Facades\Cache::put($cacheKey, $data, 86400);
@@ -532,66 +560,171 @@ class CustomerController extends Controller
     }
 
     /**
-     * Build prioritized candidate search strings from raw Indian customer address strings
+     * Search verified customer addresses in the CRM database for matching buildings/societies
      */
-    protected function buildGeocodeCandidates(string $raw): array
+    protected function searchVerifiedCrmAddresses(string $searchString): array
     {
-        $raw = trim($raw);
-        if (empty($raw)) {
+        $searchString = strtolower($searchString);
+        $tokens = array_filter(preg_split('/[,\s\-\.\/]+/', $searchString), function ($t) {
+            return strlen($t) >= 3 && !in_array($t, [
+                'the', 'and', 'near', 'opp', 'opposite', 'behind', 'beside',
+                'pune', 'flat', 'shop', 'phase', 'road', 'apartment', 'apartments',
+                'bldg', 'building', 'colony', 'nagar', 'lane', 'chowk', 'subdistrict'
+            ]);
+        });
+
+        if (empty($tokens)) {
             return [];
         }
 
-        $candidates = [];
-        $hasCity = (bool) preg_match('/\b(pune|pimpr[i\-]|chinchwad|haveli|pcmc)\b/i', $raw);
+        $addresses = \App\Models\CustomerAddress::whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where('latitude', '!=', 0.0)
+            ->get();
 
-        // 1. Exact raw query
-        $candidates[] = $raw;
-        if (!$hasCity) {
-            $candidates[] = $raw . ', Pune';
+        $matches = [];
+        foreach ($addresses as $addr) {
+            $haystack = strtolower(implode(' ', array_filter([
+                $addr->address_line1,
+                $addr->address_line2,
+                $addr->landmark,
+                $addr->city
+            ])));
+
+            $score = 0;
+            foreach ($tokens as $token) {
+                if (str_contains($haystack, $token)) {
+                    $score += (strlen($token) >= 5 ? 2 : 1);
+                }
+            }
+
+            if ($score >= 2) {
+                $parts = array_filter([
+                    $addr->address_line1,
+                    $addr->address_line2,
+                    $addr->landmark ? 'Near ' . $addr->landmark : null,
+                    $addr->city
+                ]);
+                $matches[] = [
+                    'latitude' => (float) $addr->latitude,
+                    'longitude' => (float) $addr->longitude,
+                    'display_name' => implode(', ', $parts) . ' [Verified Building in CRM]',
+                    'matched_term' => $addr->address_line1,
+                    'type' => 'verified_crm_building',
+                    'accuracy' => 'exact',
+                    'score' => $score,
+                ];
+            }
+        }
+
+        usort($matches, function ($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+
+        return $matches;
+    }
+
+    /**
+     * Classify geocode match accuracy level
+     */
+    protected function classifyAccuracy(string $type): string
+    {
+        $type = strtolower($type);
+        if (in_array($type, ['verified_crm_building', 'building', 'house', 'apartments', 'residential', 'home'])) {
+            return 'exact'; // +-10 to 30 meters
+        }
+        if (in_array($type, ['community_centre', 'temple', 'place_of_worship', 'hospital', 'school', 'college', 'street', 'highway', 'tertiary', 'secondary', 'primary', 'residential_street', 'commercial', 'park', 'bus_stop', 'mall', 'bank'])) {
+            return 'high'; // +-50 to 100 meters
+        }
+        return 'approximate'; // suburb / locality centroid (~500m - 1.5km)
+    }
+
+    /**
+     * Build prioritized candidate search strings from raw Indian customer address strings, landmarks, and area
+     */
+    protected function buildGeocodeCandidates(string $raw, string $landmark = '', string $area = '', string $city = 'Pune'): array
+    {
+        $raw = trim($raw);
+        $candidates = [];
+
+        $hasCity = (bool) preg_match('/\b(pune|pimpr[i\-]|chinchwad|haveli|pcmc)\b/i', $raw . ' ' . $area . ' ' . $landmark);
+        $citySuffix = $hasCity ? '' : (', ' . ($city ?: 'Pune'));
+
+        // 1. If landmark provided, prioritize landmark + area + city
+        if (!empty($landmark)) {
+            $cleanLandmark = trim(preg_replace('/\b(near|opp|opposite|behind|beside|adj|adjacent)\s*[:#\.\-\s]*/i', '', $landmark));
+            if (!empty($cleanLandmark)) {
+                if (!empty($area)) {
+                    $candidates[] = $cleanLandmark . ', ' . $area . $citySuffix;
+                }
+                $candidates[] = $cleanLandmark . $citySuffix;
+                $candidates[] = $cleanLandmark;
+            }
+        }
+
+        // 2. If area / colony provided
+        if (!empty($area)) {
+            $candidates[] = $area . $citySuffix;
+        }
+
+        // 3. Exact raw query
+        if (!empty($raw)) {
+            $candidates[] = $raw;
+            if (!$hasCity) {
+                $candidates[] = $raw . $citySuffix;
+            }
         }
 
         $noisePattern = '/\b(flat|shop|office|unit|room|block|apt|apartment|phase|sector|sec|plot|survey\s*no|sr\s*no|house\s*no|s\s*no|near|opp|opposite|behind|beside)\s*[:#\.\-\s]*[\w\d\-]+/i';
 
-        // Split into segments by comma/slash/semicolon
+        // 4. Split raw into segments by comma/slash/semicolon
         $segments = array_values(array_filter(array_map(function ($s) {
             return trim(preg_replace('/\s+/', ' ', $s));
         }, preg_split('/[,;\/]+/', $raw))));
 
         $segCount = count($segments);
 
-        // 2. If multiple segments, extract the primary locality
         if ($segCount > 1) {
+            // Check if any segment is a landmark or society name
+            foreach ($segments as $seg) {
+                $cleanedSeg = trim(preg_replace('/\s+/', ' ', preg_replace($noisePattern, ' ', $seg)));
+                $cleanedSeg = trim(preg_replace('/^[, \-]+|[, \-]+$/', '', $cleanedSeg));
+                if (strlen($cleanedSeg) >= 4 && !preg_match('/\b(pune|pcmc|maharashtra|india)\b/i', $cleanedSeg)) {
+                    $candidates[] = $cleanedSeg . $citySuffix;
+                    $candidates[] = $cleanedSeg;
+                }
+            }
+
+            // Locality + City
             $last = $segments[$segCount - 1];
             $isLastCity = (bool) preg_match('/\b(pune|pimpr[i\-]|chinchwad|pcmc|maharashtra|india)\b/i', $last);
             $locality = ($isLastCity && $segCount > 2) ? $segments[$segCount - 2] : $last;
 
             $cleanedLocality = trim(preg_replace('/\s+/', ' ', preg_replace($noisePattern, ' ', $locality)));
             if (!empty($cleanedLocality)) {
-                $candidates[] = $cleanedLocality . ($hasCity ? '' : ', Pune');
+                $candidates[] = $cleanedLocality . $citySuffix;
                 $candidates[] = $cleanedLocality;
             }
 
-            // Combinations of locality with prior segment or city
-            if ($segCount >= 2) {
-                $right2 = implode(', ', array_slice($segments, -2));
-                $candidates[] = $right2;
-                if (!$hasCity && !preg_match('/\b(pune|pcmc)\b/i', $right2)) {
-                    $candidates[] = $right2 . ', Pune';
-                }
+            // Right-side 2 segments
+            $right2 = implode(', ', array_slice($segments, -2));
+            $candidates[] = $right2;
+            if (!$hasCity && !preg_match('/\b(pune|pcmc)\b/i', $right2)) {
+                $candidates[] = $right2 . $citySuffix;
             }
         }
 
-        // 3. Cleaned raw query without noise words (e.g. flat, phase, apt)
+        // Cleaned raw query without noise
         $cleanedRaw = trim(preg_replace('/\s+/', ' ', preg_replace($noisePattern, ' ', $raw)));
         $cleanedRaw = trim(preg_replace('/^[, \-]+|[, \-]+$/', '', $cleanedRaw));
         if (!empty($cleanedRaw) && strtolower($cleanedRaw) !== strtolower($raw)) {
             $candidates[] = $cleanedRaw;
             if (!$hasCity && !preg_match('/\b(pune|pcmc)\b/i', $cleanedRaw)) {
-                $candidates[] = $cleanedRaw . ', Pune';
+                $candidates[] = $cleanedRaw . $citySuffix;
             }
         }
 
-        // Deduplicate
+        // Deduplicate while preserving order
         $unique = [];
         foreach ($candidates as $c) {
             $k = strtolower(trim($c));

@@ -22,7 +22,7 @@
     <div class="space-y-1.5">
         <div class="flex items-center gap-1.5">
             <div class="relative flex-1">
-                <input type="text" id="{{ $p }}_search_input" placeholder="Search locality, area, landmark, society, building..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                <input type="text" id="{{ $p }}_search_input" placeholder="Search society, building, landmark, road or area..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
             </div>
             <button type="button" id="{{ $p }}_btn_locate" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0" title="Locate typed address on map">
@@ -82,7 +82,7 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
 
     const centerLat = hasInitialCoords ? initialLat : (config.defaultCenterLat || 18.5204);
     const centerLng = hasInitialCoords ? initialLng : (config.defaultCenterLng || 73.8567);
-    const zoom = hasInitialCoords ? 16 : 13;
+    const zoom = hasInitialCoords ? 17 : 13;
 
     const latInput = document.getElementById(p + '_input_lat');
     const lngInput = document.getElementById(p + '_input_lng');
@@ -94,11 +94,14 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     const feedbackEl = document.getElementById(p + '_search_feedback');
     const suggestionsEl = document.getElementById(p + '_suggestions_box');
 
+    let debounceTimer = null;
+
     function updateBadge(type, text) {
         if (!badge) return;
         badge.className = 'px-2 py-0.5 rounded text-[10px] font-bold font-mono border ' +
             (type === 'exact' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-            (type === 'geocoded' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'));
+            (type === 'high' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+            (type === 'geocoded' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200')));
         badge.innerText = text;
     }
 
@@ -109,15 +112,20 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
 
     function showFeedback(type, title, message) {
         if (!feedbackEl) return;
-        feedbackEl.className = 'text-xs p-2 rounded-lg border flex items-start justify-between gap-1.5 ' +
+        feedbackEl.className = 'text-xs p-2.5 rounded-lg border flex items-start justify-between gap-1.5 ' +
             (type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
-            (type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-800'));
+            (type === 'high' ? 'bg-sky-50 border-sky-200 text-sky-900' :
+            (type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-800')));
+        
+        const iconName = type === 'success' ? 'check-circle-2' : (type === 'high' ? 'map-pin' : (type === 'warning' ? 'alert-triangle' : 'info'));
+        const iconColor = type === 'success' ? 'text-emerald-600' : (type === 'high' ? 'text-sky-600' : (type === 'warning' ? 'text-amber-600' : 'text-slate-500'));
+
         feedbackEl.innerHTML = `
-            <div class="flex items-start gap-1.5 flex-1">
-                <i data-lucide="${type === 'success' ? 'check-circle-2' : (type === 'warning' ? 'alert-triangle' : 'info')}" class="w-3.5 h-3.5 mt-0.5 shrink-0 ${type === 'success' ? 'text-emerald-600' : (type === 'warning' ? 'text-amber-600' : 'text-slate-500')}"></i>
+            <div class="flex items-start gap-2 flex-1">
+                <i data-lucide="${iconName}" class="w-4 h-4 mt-0.5 shrink-0 ${iconColor}"></i>
                 <div class="leading-tight">
-                    <span class="font-bold text-[11px]">${escapeHtml(title)}</span>
-                    <span class="text-[10px] text-slate-600 ml-1">${escapeHtml(message)}</span>
+                    <span class="font-bold text-[11px] block text-slate-800">${escapeHtml(title)}</span>
+                    <span class="text-[10px] text-slate-600 mt-0.5 block">${escapeHtml(message)}</span>
                 </div>
             </div>
             <button type="button" class="text-slate-400 hover:text-slate-600 text-xs px-1 font-bold" onclick="document.getElementById('${p}_search_feedback').classList.add('hidden')">&times;</button>
@@ -221,7 +229,7 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     if (recenterBtn) {
         recenterBtn.addEventListener('click', function() {
             const pos = marker.getLatLng();
-            map.setView(pos, 16);
+            map.setView(pos, 17);
         });
     }
 
@@ -241,7 +249,7 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
                 gpsBtn.innerHTML = '<i data-lucide="crosshair" class="w-3.5 h-3.5 text-slate-600"></i><span class="hidden sm:inline">My GPS</span>';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
                 setCoordinates(pos.coords.latitude, pos.coords.longitude, 'exact', 'Verified Device GPS');
-                map.flyTo([pos.coords.latitude, pos.coords.longitude], 17, { animate: true, duration: 1.0 });
+                map.flyTo([pos.coords.latitude, pos.coords.longitude], 18, { animate: true, duration: 1.0 });
                 showFeedback('success', 'GPS Acquired:', 'Pin set to current device location. Drag pin if needed to refine entrance.');
             }, function(err) {
                 gpsBtn.disabled = false;
@@ -252,17 +260,22 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
         });
     }
 
-    // Locate Address button & Search
+    // Locate Address button & Search with Landmark & Accuracy Prioritization
     function performSearch() {
         let q = searchInput ? searchInput.value.trim() : '';
+        const form = canvasEl.closest('form') || document.querySelector('#add-customer-modal form') || document.querySelector('#edit-customer-modal form');
+        const formLandmark = form ? (form.querySelector('[name="landmark"]')?.value || '') : '';
+        const formArea = form ? (form.querySelector('[name="address_line2"]')?.value || '') : '';
+        const formCity = form ? (form.querySelector('[name="city"]')?.value || 'Pune') : 'Pune';
+
         if (!q && config.getAddressString) {
             q = config.getAddressString().trim();
             if (q && searchInput) {
                 searchInput.value = q;
             }
         }
-        if (!q) {
-            showFeedback('warning', 'Address Required:', 'Please enter an address or locality in the search bar.');
+        if (!q && !formLandmark && !formArea) {
+            showFeedback('warning', 'Address Required:', 'Please enter an address, society name, or landmark to search.');
             if (searchInput) searchInput.focus();
             return;
         }
@@ -277,25 +290,62 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
         $.ajax({
             url: "{{ route('customers.geocode') }}",
             type: 'GET',
-            data: { query: q },
+            data: {
+                query: q,
+                landmark: formLandmark,
+                area: formArea,
+                city: formCity
+            },
             success: function(res) {
                 if (res && res.success && res.latitude && res.longitude) {
-                    setCoordinates(res.latitude, res.longitude, 'geocoded', 'Located Area (Adjust pin to entrance)');
-                    if (picker.map) {
-                        picker.map.flyTo([res.latitude, res.longitude], 16, { animate: true, duration: 1.0 });
+                    const accuracy = res.accuracy || 'approximate';
+                    let badgeType = 'geocoded';
+                    let badgeText = 'Located Area (Adjust pin)';
+                    let targetZoom = 17;
+                    let feedbackType = 'high';
+
+                    if (accuracy === 'exact') {
+                        badgeType = 'exact';
+                        badgeText = 'Verified Building (Exact)';
+                        targetZoom = 18;
+                        feedbackType = 'success';
+                        showFeedback('success', '🎯 Exact Building Found:', (res.display_name || res.matched_term) + ' — Pin placed right at the building premise entrance.');
+                    } else if (accuracy === 'high') {
+                        badgeType = 'high';
+                        badgeText = 'Landmark/Street (~50-100m)';
+                        targetZoom = 17;
+                        feedbackType = 'high';
+                        showFeedback('high', '📍 Landmark / Street Located (~50-100m):', (res.display_name || res.matched_term) + ' — Map zoomed into street view. Drag the red pin to the exact entrance gate.');
+                    } else {
+                        badgeType = 'geocoded';
+                        badgeText = 'Locality Centroid';
+                        targetZoom = 16;
+                        feedbackType = 'warning';
+                        showFeedback('warning', '📍 Locality Centroid Located:', (res.display_name || res.matched_term) + ' — Map centered at this area. Drag the red pin or enter your landmark for +-100m accuracy.');
                     }
-                    showFeedback('success', 'Area Located:', (res.display_name || res.matched_term) + ' — Now drag the red pin or click map to set exact premise entrance.');
+
+                    setCoordinates(res.latitude, res.longitude, badgeType, badgeText);
+                    if (picker.map) {
+                        picker.map.flyTo([res.latitude, res.longitude], targetZoom, { animate: true, duration: 1.0 });
+                    }
 
                     // Render suggestion chips if multiple results found
                     if (suggestionsEl && res.results && res.results.length > 1) {
                         suggestionsEl.className = 'p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 text-xs';
-                        let chipsHtml = '<div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Alternate Matches / Specific Landmarks:</div><div class="flex flex-wrap gap-1">';
+                        let chipsHtml = '<div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Nearby Specific Landmarks & Roads (Click to jump):</div><div class="flex flex-wrap gap-1">';
+                        
                         res.results.forEach(function(item) {
                             const parts = (item.display_name || '').split(',');
                             const shortLabel = parts.slice(0, 3).join(', ');
-                            const typeTag = item.type ? ` (${item.type})` : '';
-                            chipsHtml += `<button type="button" class="${p}_suggestion_btn px-2 py-1 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-800 rounded text-[10px] font-medium transition text-left cursor-pointer" data-lat="${item.latitude}" data-lng="${item.longitude}" data-name="${escapeHtml(item.display_name)}">
-                                📍 ${escapeHtml(shortLabel)}<span class="text-slate-400 text-[9px]">${escapeHtml(typeTag)}</span>
+                            const isExact = (item.accuracy === 'exact');
+                            const isHigh = (item.accuracy === 'high');
+                            
+                            const badgeTag = isExact ? 
+                                '<span class="ml-1 px-1 py-0.2 rounded text-[8px] font-bold bg-emerald-100 text-emerald-800">Exact Building</span>' :
+                                (isHigh ? '<span class="ml-1 px-1 py-0.2 rounded text-[8px] font-bold bg-sky-100 text-sky-800">~50-100m</span>' : '');
+
+                            chipsHtml += `<button type="button" class="${p}_suggestion_btn px-2 py-1 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-800 rounded text-[10px] font-medium transition text-left cursor-pointer flex items-center" data-lat="${item.latitude}" data-lng="${item.longitude}" data-name="${escapeHtml(item.display_name)}" data-accuracy="${item.accuracy || 'approximate'}">
+                                📍 ${escapeHtml(shortLabel)}${badgeTag}
                             </button>`;
                         });
                         chipsHtml += '</div>';
@@ -308,11 +358,17 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
                                 const bLat = parseFloat(this.getAttribute('data-lat'));
                                 const bLng = parseFloat(this.getAttribute('data-lng'));
                                 const bName = this.getAttribute('data-name');
-                                setCoordinates(bLat, bLng, 'geocoded', 'Located Area (Adjust pin to entrance)');
+                                const bAcc = this.getAttribute('data-accuracy');
+
+                                const cZoom = (bAcc === 'exact' ? 18 : (bAcc === 'high' ? 17 : 16));
+                                const cBadge = (bAcc === 'exact' ? 'exact' : (bAcc === 'high' ? 'high' : 'geocoded'));
+                                const cText = (bAcc === 'exact' ? 'Verified Building (Exact)' : (bAcc === 'high' ? 'Landmark/Street (~50-100m)' : 'Located Area'));
+
+                                setCoordinates(bLat, bLng, cBadge, cText);
                                 if (picker.map) {
-                                    picker.map.flyTo([bLat, bLng], 17, { animate: true, duration: 0.8 });
+                                    picker.map.flyTo([bLat, bLng], cZoom, { animate: true, duration: 0.8 });
                                 }
-                                showFeedback('success', 'Jumped to:', bName + ' — Now drag the pin to pinpoint customer entrance.');
+                                showFeedback(bAcc === 'exact' ? 'success' : 'high', 'Jumped to:', bName + ' — Drag the pin to pinpoint customer entrance.');
                                 suggestionsEl.classList.add('hidden');
                             });
                         });

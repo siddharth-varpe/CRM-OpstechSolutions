@@ -431,4 +431,47 @@ class CustomerPrecisionLocationTest extends TestCase
         $this->assertStringContainsString('pimple gurav', strtolower($json['matched_term']));
         $this->assertNotEmpty($json['results']);
     }
+
+    /**
+     * Test I: Geocoding endpoint matches existing verified CRM building with 0m variation
+     */
+    public function test_geocode_endpoint_matches_crm_verified_building(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $customer = Customer::create([
+            'customer_number' => 'CUST-VERIF-' . Str::random(5),
+            'full_name' => 'Verified Society Resident',
+            'phone' => '9876543210',
+            'customer_type' => 'INDIVIDUAL',
+            'status' => 'ACTIVE',
+        ]);
+
+        CustomerAddress::create([
+            'customer_id' => $customer->id,
+            'address_type' => 'SERVICE',
+            'address_line1' => 'Akash-Kiran Apartment, Phase-2',
+            'address_line2' => 'Pimple Gurav',
+            'landmark' => 'Near Ramkrishna Mangalkaryalay',
+            'city' => 'Pune',
+            'state' => 'Maharashtra',
+            'postal_code' => '411061',
+            'latitude' => 18.5841240,
+            'longitude' => 73.8219371,
+            'is_default' => true,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)->getJson(route('customers.geocode', [
+            'query' => 'akash kiran apartment phase 2, pimple gurav'
+        ]));
+
+        $response->assertStatus(200);
+        $json = $response->json();
+        $this->assertTrue($json['success']);
+        $this->assertEqualsWithDelta(18.5841240, (float) $json['latitude'], 0.000001);
+        $this->assertEqualsWithDelta(73.8219371, (float) $json['longitude'], 0.000001);
+        $this->assertEquals('exact', $json['accuracy']);
+        $this->assertFalse($json['is_approximate']);
+        $this->assertStringContainsString('Verified Building in CRM', $json['display_name']);
+    }
 }
