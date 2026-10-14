@@ -473,5 +473,60 @@ class CustomerPrecisionLocationTest extends TestCase
         $this->assertEquals('exact', $json['accuracy']);
         $this->assertFalse($json['is_approximate']);
         $this->assertStringContainsString('Verified Building in CRM', $json['display_name']);
+
+        // Verify components for auto-fill into customer form
+        $this->assertArrayHasKey('components', $json);
+        $this->assertEquals('Akash-Kiran Apartment, Phase-2', $json['components']['address_line1']);
+        $this->assertEquals('Pimple Gurav', $json['components']['address_line2']);
+        $this->assertEquals('Near Ramkrishna Mangalkaryalay', $json['components']['landmark']);
+        $this->assertEquals('Pune', $json['components']['city']);
+        $this->assertEquals('411061', $json['components']['postal_code']);
+
+        // Verify each result option also carries components for selection
+        foreach ($json['results'] as $result) {
+            $this->assertArrayHasKey('components', $result);
+            $this->assertArrayHasKey('address_line1', $result['components']);
+        }
+    }
+
+    /**
+     * Test J: Reverse geocode endpoint returns structured address components
+     */
+    public function test_reverse_geocode_returns_structured_components(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://nominatim.openstreetmap.org/reverse*' => \Illuminate\Support\Facades\Http::response([
+                'display_name' => 'Akash-Kiran Apartment, Pimple Gurav, Haveli, Pune, Maharashtra, 411061, India',
+                'address' => [
+                    'building' => 'Akash-Kiran Apartment',
+                    'road' => 'Pimple Gurav Road',
+                    'suburb' => 'Pimple Gurav',
+                    'amenity' => 'Ramkrishna Mangal Karyalaya',
+                    'city' => 'Pune',
+                    'state' => 'Maharashtra',
+                    'postcode' => '411061',
+                    'country' => 'India',
+                ]
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($this->adminUser)->getJson(route('customers.reverse_geocode', [
+            'lat' => 18.5841240,
+            'lng' => 73.8219371,
+        ]));
+
+        $response->assertStatus(200);
+        $json = $response->json();
+        $this->assertTrue($json['success']);
+        $this->assertArrayHasKey('components', $json);
+        $this->assertEquals('Pimple Gurav Road', $json['components']['address_line1']);
+        $this->assertEquals('Pimple Gurav', $json['components']['address_line2']);
+        $this->assertEquals('Ramkrishna Mangal Karyalaya', $json['components']['landmark']);
+        $this->assertEquals('Pune', $json['components']['city']);
+        $this->assertEquals('Maharashtra', $json['components']['state']);
+        $this->assertEquals('411061', $json['components']['postal_code']);
     }
 }
+

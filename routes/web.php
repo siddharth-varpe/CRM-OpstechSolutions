@@ -51,6 +51,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     Route::get('/customers/geocode', [CustomerController::class, 'geocodeAddress'])->name('customers.geocode');
+    Route::get('/customers/reverse-geocode', [CustomerController::class, 'reverseGeocode'])->name('customers.reverse_geocode');
     Route::get('/customers/export/csv', [CustomerController::class, 'exportCsv'])->name('customers.export');
     Route::post('/customers/import/analyze', [CustomerController::class, 'analyzeImport'])->name('customers.import.analyze');
     Route::post('/customers/import/commit', [CustomerController::class, 'commitImport'])->name('customers.import.commit');

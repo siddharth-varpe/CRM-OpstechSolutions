@@ -45,14 +45,21 @@
     <!-- Map Canvas Container -->
     <div class="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
         <div id="{{ $p }}_map_canvas" class="w-full h-52 z-0"></div>
-        <div class="absolute bottom-1.5 left-2 right-2 z-10 pointer-events-none flex items-center justify-between">
-            <span class="bg-white/95 backdrop-blur-xs text-[10px] text-slate-700 px-2 py-0.5 rounded shadow-xs font-medium border border-slate-200/80 pointer-events-auto">
-                <i data-lucide="info" class="w-3 h-3 inline mr-0.5 text-primary-600"></i>
-                Drag pin or click map to place exact entrance marker
+        <div class="absolute bottom-1.5 left-2 right-2 z-10 pointer-events-none flex items-center justify-between gap-1 flex-wrap">
+            <span class="bg-white/95 backdrop-blur-xs text-[10px] text-slate-700 px-2 py-0.5 rounded shadow-xs font-medium border border-slate-200/80 pointer-events-auto flex items-center gap-1">
+                <i data-lucide="info" class="w-3 h-3 text-primary-600"></i>
+                <span class="hidden sm:inline">Drag pin to exact entrance</span>
+                <span class="sm:hidden">Drag pin</span>
             </span>
-            <button type="button" id="{{ $p }}_btn_recenter" class="bg-white/95 hover:bg-white text-[10px] text-slate-700 px-2 py-0.5 rounded shadow-xs font-semibold border border-slate-200 pointer-events-auto transition">
-                Center Pin
-            </button>
+            <div class="flex items-center gap-1.5 pointer-events-auto">
+                <button type="button" id="{{ $p }}_btn_fill_from_pin" class="bg-white/95 hover:bg-emerald-50 text-[10px] text-emerald-700 hover:text-emerald-800 px-2.5 py-0.5 rounded shadow-xs font-bold border border-emerald-300 transition flex items-center gap-1" title="Auto-fill address inputs from current pin position">
+                    <i data-lucide="file-input" class="w-3 h-3 text-emerald-600"></i>
+                    <span>Fill Address from Pin</span>
+                </button>
+                <button type="button" id="{{ $p }}_btn_recenter" class="bg-white/95 hover:bg-white text-[10px] text-slate-700 px-2 py-0.5 rounded shadow-xs font-semibold border border-slate-200 transition">
+                    Center Pin
+                </button>
+            </div>
         </div>
     </div>
 
@@ -91,10 +98,9 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     const locateBtn = document.getElementById(p + '_btn_locate');
     const gpsBtn = document.getElementById(p + '_btn_gps');
     const recenterBtn = document.getElementById(p + '_btn_recenter');
+    const fillFromPinBtn = document.getElementById(p + '_btn_fill_from_pin');
     const feedbackEl = document.getElementById(p + '_search_feedback');
     const suggestionsEl = document.getElementById(p + '_suggestions_box');
-
-    let debounceTimer = null;
 
     function updateBadge(type, text) {
         if (!badge) return;
@@ -110,27 +116,162 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
         return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function showFeedback(type, title, message) {
+    function flashInput(el) {
+        if (!el) return;
+        el.classList.add('transition-all', 'duration-300', 'bg-emerald-50', 'border-emerald-500', 'ring-2', 'ring-emerald-200');
+        setTimeout(function() {
+            el.classList.remove('bg-emerald-50', 'border-emerald-500', 'ring-2', 'ring-emerald-200');
+        }, 1500);
+    }
+
+    function preserveUnitPrefix(existingVal, newBuilding) {
+        if (!existingVal || !newBuilding) return newBuilding || existingVal || '';
+        if (newBuilding.toLowerCase().includes(existingVal.toLowerCase())) {
+            return newBuilding;
+        }
+        const unitMatch = existingVal.match(/^((?:flat|shop|office|room|unit|bldg|house|block|plot|gala|survey|sr\.?|sr|h\.?no|hno|#)\s*[\w\-\/\s]+?)(?:,\s*.*)?$/i);
+        if (unitMatch && unitMatch[1]) {
+            const unitStr = unitMatch[1].trim();
+            if (!newBuilding.toLowerCase().startsWith(unitStr.toLowerCase())) {
+                return unitStr + ', ' + newBuilding;
+            }
+        }
+        if (/^[A-Za-z0-9\-\/\s]{1,12}$/.test(existingVal) && !existingVal.toLowerCase().includes('pune') && !existingVal.toLowerCase().includes('apartment')) {
+            return existingVal + ', ' + newBuilding;
+        }
+        return newBuilding;
+    }
+
+    // Auto-fill address components into the enclosing modal form
+    function applyAddressComponents(components, displayName) {
+        if (!components && !displayName) return;
+        components = components || {};
+
+        const form = canvasEl.closest('form')
+            || document.querySelector('#' + p + '_location_picker_root')?.closest('form')
+            || document.querySelector('#add-customer-modal form')
+            || document.querySelector('#edit-customer-modal form')
+            || document.querySelector('#add-address-modal form');
+
+        if (!form) {
+            console.warn('Form not found for auto-fill');
+            return;
+        }
+
+        const line1Input = form.querySelector('[name="address_line1"]');
+        const line2Input = form.querySelector('[name="address_line2"]');
+        const landmarkInput = form.querySelector('[name="landmark"]');
+        const cityInput = form.querySelector('[name="city"]');
+        const stateInput = form.querySelector('[name="state"]');
+        const postalInput = form.querySelector('[name="postal_code"]');
+
+        // 1. Address Line 1 (Building / Premise)
+        if (line1Input) {
+            const rawBuilding = components.address_line1 || (displayName ? displayName.split(',')[0].replace(/\[Verified Building in CRM\]/i, '').trim() : '');
+            if (rawBuilding) {
+                const curVal = line1Input.value.trim();
+                line1Input.value = preserveUnitPrefix(curVal, rawBuilding);
+                line1Input.dispatchEvent(new Event('input', { bubbles: true }));
+                line1Input.dispatchEvent(new Event('change', { bubbles: true }));
+                flashInput(line1Input);
+            }
+        }
+
+        // 2. Address Line 2 (Area / Colony)
+        if (line2Input && components.address_line2) {
+            line2Input.value = components.address_line2;
+            line2Input.dispatchEvent(new Event('input', { bubbles: true }));
+            line2Input.dispatchEvent(new Event('change', { bubbles: true }));
+            flashInput(line2Input);
+        }
+
+        // 3. Landmark
+        if (landmarkInput && components.landmark) {
+            landmarkInput.value = components.landmark;
+            landmarkInput.dispatchEvent(new Event('input', { bubbles: true }));
+            landmarkInput.dispatchEvent(new Event('change', { bubbles: true }));
+            flashInput(landmarkInput);
+        }
+
+        // 4. City
+        if (cityInput) {
+            cityInput.value = components.city || cityInput.value || 'Pune';
+            cityInput.dispatchEvent(new Event('input', { bubbles: true }));
+            cityInput.dispatchEvent(new Event('change', { bubbles: true }));
+            flashInput(cityInput);
+        }
+
+        // 5. State
+        if (stateInput) {
+            stateInput.value = components.state || stateInput.value || 'Maharashtra';
+            stateInput.dispatchEvent(new Event('input', { bubbles: true }));
+            stateInput.dispatchEvent(new Event('change', { bubbles: true }));
+            flashInput(stateInput);
+        }
+
+        // 6. Postal Code
+        if (postalInput && components.postal_code) {
+            postalInput.value = components.postal_code;
+            postalInput.dispatchEvent(new Event('input', { bubbles: true }));
+            postalInput.dispatchEvent(new Event('change', { bubbles: true }));
+            flashInput(postalInput);
+        }
+
+        // Update search bar text to clean confirmed name
+        if (searchInput && (components.address_line1 || displayName)) {
+            const cleanName = components.address_line1 || (displayName ? displayName.split(',')[0].replace(/\[Verified Building in CRM\]/i, '').trim() : '');
+            if (cleanName) {
+                searchInput.value = cleanName;
+            }
+        }
+    }
+
+    function showFeedback(type, title, message, components, displayName) {
         if (!feedbackEl) return;
-        feedbackEl.className = 'text-xs p-2.5 rounded-lg border flex items-start justify-between gap-1.5 ' +
-            (type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
-            (type === 'high' ? 'bg-sky-50 border-sky-200 text-sky-900' :
+        feedbackEl.className = 'text-xs p-2.5 rounded-xl border flex items-start justify-between gap-2 ' +
+            (type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-2xs' :
+            (type === 'high' ? 'bg-sky-50 border-sky-200 text-sky-900 shadow-2xs' :
             (type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-800')));
         
         const iconName = type === 'success' ? 'check-circle-2' : (type === 'high' ? 'map-pin' : (type === 'warning' ? 'alert-triangle' : 'info'));
         const iconColor = type === 'success' ? 'text-emerald-600' : (type === 'high' ? 'text-sky-600' : (type === 'warning' ? 'text-amber-600' : 'text-slate-500'));
 
+        let actionBtnHtml = '';
+        if (components && (type === 'success' || type === 'high')) {
+            actionBtnHtml = `
+                <button type="button" id="${p}_btn_autofill_primary" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-extrabold shadow-xs transition flex items-center gap-1 shrink-0 cursor-pointer" title="Auto-fill this confirmed address into customer address fields">
+                    <i data-lucide="check" class="w-3 h-3"></i>
+                    <span>Auto-fill Address</span>
+                </button>
+            `;
+        }
+
         feedbackEl.innerHTML = `
-            <div class="flex items-start gap-2 flex-1">
+            <div class="flex items-start gap-2 flex-1 min-w-0">
                 <i data-lucide="${iconName}" class="w-4 h-4 mt-0.5 shrink-0 ${iconColor}"></i>
-                <div class="leading-tight">
+                <div class="leading-tight min-w-0 flex-1">
                     <span class="font-bold text-[11px] block text-slate-800">${escapeHtml(title)}</span>
-                    <span class="text-[10px] text-slate-600 mt-0.5 block">${escapeHtml(message)}</span>
+                    <span class="text-[10px] text-slate-600 mt-0.5 block truncate sm:whitespace-normal">${escapeHtml(message)}</span>
                 </div>
             </div>
-            <button type="button" class="text-slate-400 hover:text-slate-600 text-xs px-1 font-bold" onclick="document.getElementById('${p}_search_feedback').classList.add('hidden')">&times;</button>
+            <div class="flex items-center gap-1.5 shrink-0">
+                ${actionBtnHtml}
+                <button type="button" class="text-slate-400 hover:text-slate-600 text-xs px-1 font-bold cursor-pointer" onclick="document.getElementById('${p}_search_feedback').classList.add('hidden')">&times;</button>
+            </div>
         `;
         feedbackEl.classList.remove('hidden');
+
+        if (components && (type === 'success' || type === 'high')) {
+            const autoFillBtn = document.getElementById(p + '_btn_autofill_primary');
+            if (autoFillBtn) {
+                autoFillBtn.addEventListener('click', function() {
+                    applyAddressComponents(components, displayName);
+                    showFeedback('success', '✓ Confirmed & Address Auto-filled:', (components.address_line1 || (displayName ? displayName.split(',')[0] : 'Confirmed address')) + ' has been populated into the customer address fields.');
+                    if (suggestionsEl) suggestionsEl.classList.add('hidden');
+                });
+            }
+        }
+
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
@@ -233,6 +374,41 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
         });
     }
 
+    // Fill Address from Pin button (Reverse Geocoding)
+    if (fillFromPinBtn) {
+        fillFromPinBtn.addEventListener('click', function() {
+            const pos = marker.getLatLng();
+            fillFromPinBtn.disabled = true;
+            fillFromPinBtn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Fetching...';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            $.ajax({
+                url: "{{ route('customers.reverse_geocode') }}",
+                type: 'GET',
+                data: {
+                    lat: pos.lat,
+                    lng: pos.lng
+                },
+                success: function(res) {
+                    if (res && res.success && res.components) {
+                        applyAddressComponents(res.components, res.display_name);
+                        showFeedback('success', '✓ Address Filled from Pin:', (res.display_name || 'Pin location') + ' auto-filled into customer address fields.');
+                    } else {
+                        showFeedback('warning', 'Reverse Geocode:', 'Could not fetch address details for this pin coordinate.');
+                    }
+                },
+                error: function() {
+                    showFeedback('warning', 'Reverse Geocode:', 'Could not fetch address details for this pin coordinate.');
+                },
+                complete: function() {
+                    fillFromPinBtn.disabled = false;
+                    fillFromPinBtn.innerHTML = '<i data-lucide="file-input" class="w-3 h-3 text-emerald-600"></i><span>Fill Address from Pin</span>';
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                }
+            });
+        });
+    }
+
     // My GPS button
     if (gpsBtn) {
         gpsBtn.addEventListener('click', function() {
@@ -309,19 +485,19 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
                         badgeText = 'Verified Building (Exact)';
                         targetZoom = 18;
                         feedbackType = 'success';
-                        showFeedback('success', '🎯 Exact Building Found:', (res.display_name || res.matched_term) + ' — Pin placed right at the building premise entrance.');
+                        showFeedback('success', '🎯 Exact Premise Found:', (res.display_name || res.matched_term) + ' — Pin placed right at building entrance.', res.components, res.display_name);
                     } else if (accuracy === 'high') {
                         badgeType = 'high';
                         badgeText = 'Landmark/Street (~50-100m)';
                         targetZoom = 17;
                         feedbackType = 'high';
-                        showFeedback('high', '📍 Landmark / Street Located (~50-100m):', (res.display_name || res.matched_term) + ' — Map zoomed into street view. Drag the red pin to the exact entrance gate.');
+                        showFeedback('high', '📍 Landmark / Street (~50-100m):', (res.display_name || res.matched_term) + ' — Street view pinned. Drag to exact entrance gate.', res.components, res.display_name);
                     } else {
                         badgeType = 'geocoded';
                         badgeText = 'Locality Centroid';
                         targetZoom = 16;
                         feedbackType = 'warning';
-                        showFeedback('warning', '📍 Locality Centroid Located:', (res.display_name || res.matched_term) + ' — Map centered at this area. Drag the red pin or enter your landmark for +-100m accuracy.');
+                        showFeedback('warning', '📍 Locality Centroid Located:', (res.display_name || res.matched_term) + ' — Centered at locality. Select a specific landmark or road below to refine.', res.components, res.display_name);
                     }
 
                     setCoordinates(res.latitude, res.longitude, badgeType, badgeText);
@@ -329,36 +505,82 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
                         picker.map.flyTo([res.latitude, res.longitude], targetZoom, { animate: true, duration: 1.0 });
                     }
 
-                    // Render suggestion chips if multiple results found
-                    if (suggestionsEl && res.results && res.results.length > 1) {
-                        suggestionsEl.className = 'p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 text-xs';
-                        let chipsHtml = '<div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Nearby Specific Landmarks & Roads (Click to jump):</div><div class="flex flex-wrap gap-1">';
+                    // Render confirmed location options list (Click to auto-fill address & pin)
+                    if (suggestionsEl && res.results && res.results.length >= 1) {
+                        suggestionsEl.className = 'p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs';
+                        let optionsHtml = `
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-primary-600"></i>
+                                    Confirmed Location Options (Click to Auto-fill Address):
+                                </span>
+                                <span class="text-[9px] text-slate-400 font-medium">Click option to apply</span>
+                            </div>
+                            <div class="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+                        `;
                         
-                        res.results.forEach(function(item) {
-                            const parts = (item.display_name || '').split(',');
-                            const shortLabel = parts.slice(0, 3).join(', ');
+                        res.results.forEach(function(item, idx) {
                             const isExact = (item.accuracy === 'exact');
                             const isHigh = (item.accuracy === 'high');
-                            
-                            const badgeTag = isExact ? 
-                                '<span class="ml-1 px-1 py-0.2 rounded text-[8px] font-bold bg-emerald-100 text-emerald-800">Exact Building</span>' :
-                                (isHigh ? '<span class="ml-1 px-1 py-0.2 rounded text-[8px] font-bold bg-sky-100 text-sky-800">~50-100m</span>' : '');
 
-                            chipsHtml += `<button type="button" class="${p}_suggestion_btn px-2 py-1 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-800 rounded text-[10px] font-medium transition text-left cursor-pointer flex items-center" data-lat="${item.latitude}" data-lng="${item.longitude}" data-name="${escapeHtml(item.display_name)}" data-accuracy="${item.accuracy || 'approximate'}">
-                                📍 ${escapeHtml(shortLabel)}${badgeTag}
-                            </button>`;
+                            const parts = (item.display_name || '').split(',');
+                            const rawTitle = parts[0] ? parts[0].replace(/\[Verified Building in CRM\]/i, '').trim() : (item.matched_term || 'Location');
+                            const rawSubtitle = parts.slice(1).join(',').replace(/\[Verified Building in CRM\]/i, '').trim();
+
+                            let badgeTag = '';
+                            if (isExact) {
+                                badgeTag = '<span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">🎯 Exact Building (0m)</span>';
+                            } else if (isHigh) {
+                                badgeTag = '<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">📍 Landmark / Road (~50-100m)</span>';
+                            } else {
+                                badgeTag = '<span class="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-200 text-slate-700">Area Centroid</span>';
+                            }
+
+                            const compJson = escapeHtml(JSON.stringify(item.components || {}));
+
+                            optionsHtml += `
+                                <button type="button" class="${p}_suggestion_btn group w-full text-left p-2.5 bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 rounded-lg transition-all shadow-2xs flex items-center justify-between gap-2.5 cursor-pointer" 
+                                    data-lat="${item.latitude}" 
+                                    data-lng="${item.longitude}" 
+                                    data-name="${escapeHtml(item.display_name)}" 
+                                    data-accuracy="${item.accuracy || 'approximate'}"
+                                    data-components="${compJson}">
+                                    <div class="flex items-start gap-2.5 flex-1 min-w-0">
+                                        <span class="w-5 h-5 rounded-full bg-slate-100 group-hover:bg-emerald-100 text-slate-600 group-hover:text-emerald-700 flex items-center justify-center shrink-0 font-bold text-[10px] mt-0.5">
+                                            ${idx + 1}
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="text-xs font-bold text-slate-800 group-hover:text-emerald-950 truncate">${escapeHtml(rawTitle)}</span>
+                                                ${badgeTag}
+                                            </div>
+                                            ${rawSubtitle ? `<p class="text-[10px] text-slate-500 group-hover:text-emerald-800 truncate mt-0.5">${escapeHtml(rawSubtitle)}</p>` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-emerald-50 group-hover:bg-emerald-600 text-emerald-700 group-hover:text-white border border-emerald-200 group-hover:border-emerald-600 rounded-md text-[10px] font-bold transition">
+                                        <i data-lucide="check" class="w-3 h-3"></i>
+                                        <span>Auto-fill</span>
+                                    </div>
+                                </button>
+                            `;
                         });
-                        chipsHtml += '</div>';
-                        suggestionsEl.innerHTML = chipsHtml;
-                        suggestionsEl.classList.remove('hidden');
 
-                        // Attach click handlers to chips
+                        optionsHtml += '</div>';
+                        suggestionsEl.innerHTML = optionsHtml;
+                        suggestionsEl.classList.remove('hidden');
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+                        // Attach click handlers to option items
                         suggestionsEl.querySelectorAll('.' + p + '_suggestion_btn').forEach(function(btn) {
                             btn.addEventListener('click', function() {
                                 const bLat = parseFloat(this.getAttribute('data-lat'));
                                 const bLng = parseFloat(this.getAttribute('data-lng'));
                                 const bName = this.getAttribute('data-name');
                                 const bAcc = this.getAttribute('data-accuracy');
+                                let bComps = {};
+                                try {
+                                    bComps = JSON.parse(this.getAttribute('data-components') || '{}');
+                                } catch(e) {}
 
                                 const cZoom = (bAcc === 'exact' ? 18 : (bAcc === 'high' ? 17 : 16));
                                 const cBadge = (bAcc === 'exact' ? 'exact' : (bAcc === 'high' ? 'high' : 'geocoded'));
@@ -368,7 +590,11 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
                                 if (picker.map) {
                                     picker.map.flyTo([bLat, bLng], cZoom, { animate: true, duration: 0.8 });
                                 }
-                                showFeedback(bAcc === 'exact' ? 'success' : 'high', 'Jumped to:', bName + ' — Drag the pin to pinpoint customer entrance.');
+
+                                // AUTO-FILL INTO CUSTOMER'S ADDRESS FIELDS!
+                                applyAddressComponents(bComps, bName);
+
+                                showFeedback('success', '✓ Confirmed & Address Auto-filled:', (bComps.address_line1 || bName.split(',')[0]) + ' has been populated into customer address fields. Pin placed at entrance.');
                                 suggestionsEl.classList.add('hidden');
                             });
                         });
@@ -425,6 +651,7 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
         map: map,
         marker: marker,
         setCoordinates: setCoordinates,
+        applyAddressComponents: applyAddressComponents,
         invalidate: function() {
             setTimeout(function() {
                 map.invalidateSize();

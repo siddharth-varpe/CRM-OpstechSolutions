@@ -462,6 +462,14 @@ class CustomerController extends Controller
                             ]);
                             $displayName = !empty($nameParts) ? implode(', ', $nameParts) : ($props['name'] ?? $candidate);
                             $rawType = $props['type'] ?? ($props['osm_value'] ?? 'place');
+                            $buildingName = $props['name'] ?? '';
+                            $streetName = $props['street'] ?? '';
+                            $areaName = $props['district'] ?? ($props['locality'] ?? '');
+                            $cityName = $props['city'] ?? 'Pune';
+                            $stateName = $props['state'] ?? 'Maharashtra';
+                            $postalCode = $props['postcode'] ?? '';
+
+                            $isLandmark = in_array($rawType, ['community_centre', 'temple', 'place_of_worship', 'hospital', 'school', 'college', 'park', 'bank', 'mall']);
 
                             $allMatches[] = [
                                 'latitude' => (float) $coords[1],
@@ -470,6 +478,14 @@ class CustomerController extends Controller
                                 'matched_term' => $candidate,
                                 'type' => $rawType,
                                 'accuracy' => $this->classifyAccuracy($rawType),
+                                'components' => [
+                                    'address_line1' => $isLandmark ? ($streetName ? $streetName : $buildingName) : ($buildingName ?: $streetName),
+                                    'address_line2' => $areaName ?: ($streetName ?: ''),
+                                    'landmark' => $isLandmark ? $buildingName : '',
+                                    'city' => $cityName,
+                                    'state' => $stateName,
+                                    'postal_code' => $postalCode,
+                                ],
                             ];
                         }
                     }
@@ -488,12 +504,14 @@ class CustomerController extends Controller
                 ])->timeout(2.5)->get('https://nominatim.openstreetmap.org/search', [
                     'q' => $candidate,
                     'format' => 'json',
+                    'addressdetails' => 1,
                     'limit' => 3,
                 ]);
 
                 if ($response->successful() && !empty($response->json())) {
                     foreach ($response->json() as $item) {
                         $rawType = $item['type'] ?? 'place';
+                        $itemAddr = $item['address'] ?? [];
                         $allMatches[] = [
                             'latitude' => (float) $item['lat'],
                             'longitude' => (float) $item['lon'],
@@ -501,6 +519,14 @@ class CustomerController extends Controller
                             'matched_term' => $candidate,
                             'type' => $rawType,
                             'accuracy' => $this->classifyAccuracy($rawType),
+                            'components' => [
+                                'address_line1' => $item['name'] ?? ($itemAddr['road'] ?? ''),
+                                'address_line2' => $itemAddr['suburb'] ?? ($itemAddr['neighbourhood'] ?? ($itemAddr['subdistrict'] ?? '')),
+                                'landmark' => $itemAddr['amenity'] ?? ($itemAddr['place_of_worship'] ?? ''),
+                                'city' => $itemAddr['city'] ?? ($itemAddr['town'] ?? ($itemAddr['city_district'] ?? 'Pune')),
+                                'state' => $itemAddr['state'] ?? 'Maharashtra',
+                                'postal_code' => $itemAddr['postcode'] ?? '',
+                            ],
                         ];
                     }
                     if (count($allMatches) >= 4) {
@@ -546,6 +572,7 @@ class CustomerController extends Controller
                 'matched_term' => $primary['matched_term'],
                 'accuracy' => $primary['accuracy'] ?? 'approximate',
                 'is_approximate' => ($primary['accuracy'] ?? '') !== 'exact',
+                'components' => $primary['components'] ?? [],
                 'results' => array_slice($uniqueMatches, 0, 6),
             ];
 
@@ -557,6 +584,61 @@ class CustomerController extends Controller
             'success' => false,
             'message' => 'No coordinates found for this address. Please place or adjust the pin manually on the map.',
         ], 404);
+    }
+
+    /**
+     * Reverse geocode a latitude and longitude to get structured address components
+     */
+    public function reverseGeocode(Request $request)
+    {
+        $lat = (float) $request->input('lat', $request->input('latitude'));
+        $lng = (float) $request->input('lng', $request->input('longitude'));
+
+        if (!$lat || !$lng || abs($lat) > 90 || abs($lng) > 180) {
+            return response()->json(['success' => false, 'message' => 'Valid latitude and longitude required'], 422);
+        }
+
+        $cacheKey = 'reverse_geo:' . round($lat, 5) . ':' . round($lng, 5);
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if ($cached) {
+            return response()->json($cached);
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'User-Agent' => 'EnterprisesCRM/1.0',
+            ])->timeout(3)->get('https://nominatim.openstreetmap.org/reverse', [
+                'lat' => $lat,
+                'lon' => $lng,
+                'format' => 'json',
+                'addressdetails' => 1,
+            ]);
+
+            if ($response->successful() && !empty($response->json())) {
+                $data = $response->json();
+                $addr = $data['address'] ?? [];
+
+                $result = [
+                    'success' => true,
+                    'display_name' => $data['display_name'] ?? '',
+                    'components' => [
+                        'address_line1' => $addr['road'] ?? ($addr['building'] ?? ($addr['amenity'] ?? '')),
+                        'address_line2' => $addr['suburb'] ?? ($addr['neighbourhood'] ?? ($addr['residential'] ?? '')),
+                        'landmark' => $addr['amenity'] ?? ($addr['shop'] ?? ($addr['place_of_worship'] ?? '')),
+                        'city' => $addr['city'] ?? ($addr['town'] ?? ($addr['city_district'] ?? 'Pune')),
+                        'state' => $addr['state'] ?? 'Maharashtra',
+                        'postal_code' => $addr['postcode'] ?? '',
+                    ],
+                ];
+
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $result, 86400);
+                return response()->json($result);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Reverse geocode failed for ({$lat}, {$lng}): " . $e->getMessage());
+        }
+
+        return response()->json(['success' => false, 'message' => 'Could not reverse geocode coordinates'], 404);
     }
 
     /**
@@ -613,6 +695,14 @@ class CustomerController extends Controller
                     'type' => 'verified_crm_building',
                     'accuracy' => 'exact',
                     'score' => $score,
+                    'components' => [
+                        'address_line1' => $addr->address_line1,
+                        'address_line2' => $addr->address_line2 ?? '',
+                        'landmark' => $addr->landmark ?? '',
+                        'city' => $addr->city ?? 'Pune',
+                        'state' => $addr->state ?? 'Maharashtra',
+                        'postal_code' => $addr->postal_code ?? '',
+                    ],
                 ];
             }
         }
