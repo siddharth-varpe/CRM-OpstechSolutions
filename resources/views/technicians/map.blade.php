@@ -170,14 +170,6 @@
                     <i data-lucide="maximize" class="w-4 h-4 text-primary-600"></i>
                     <span class="hidden sm:inline">Fit All Crew</span>
                 </button>
-
-                <button type="button"
-                        onclick="resetToPuneCenter()"
-                        class="p-2.5 bg-white/95 backdrop-blur-xs hover:bg-white text-slate-700 rounded-xl shadow-elevated border border-slate-200 transition-all font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:scale-105"
-                        title="Center Pune City">
-                    <i data-lucide="crosshair" class="w-4 h-4 text-slate-600"></i>
-                    <span class="hidden sm:inline">Center Pune</span>
-                </button>
             </div>
 
             <!-- Bottom Floating Legend with Two Distinct Routes -->
@@ -1212,13 +1204,6 @@ function fitAllMarkers() {
         mapInstance.fitBounds(bounds, 60);
     } else {
         mapInstance.setCenter(PUNE_CENTER);
-        mapInstance.setZoom(12);
-    }
-}
-
-function resetToPuneCenter() {
-    if (mapInstance) {
-        mapInstance.panTo(PUNE_CENTER);
         mapInstance.setZoom(12);
     }
 }
