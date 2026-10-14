@@ -28,6 +28,7 @@ use App\Models\ServiceSchedule;
 use App\Models\SystemSetting;
 use App\Models\Technician;
 use App\Models\TechnicianLocation;
+use App\Models\TechnicianPortalAccess;
 use App\Models\User;
 use App\Models\Warranty;
 use App\Models\WarrantyEvent;
@@ -94,6 +95,11 @@ class DataCleanupService
                 'description' => 'Supplier purchase entries and retail counter sales (item catalogue preserved with stock reset to 0)',
                 'count' => InventoryPurchase::count() + InventorySale::count(),
             ],
+            'technicians' => [
+                'label' => 'Technicians & Field Workforce',
+                'description' => 'Technician profiles, skills, portal access, and field workforce roster',
+                'count' => Technician::count() + DB::table('technician_portal_access')->count(),
+            ],
             'technician_activity' => [
                 'label' => 'Field Workforce Dispatch Activity',
                 'description' => 'GPS location breadcrumbs, live tracking status and mobile portal notifications',
@@ -120,7 +126,7 @@ class DataCleanupService
 
         $preservedEntities = [
             'Super Administrator Account' => 'Your authenticated account and administrative credentials will remain 100% active and intact.',
-            'Staff & Technician Users' => 'User login accounts (' . User::count() . ' users) and field staff directory are preserved.',
+            'Staff Users' => 'Office staff user login accounts (' . User::where('role', '!=', 'Technician')->count() . ' users) are preserved.',
             'Roles & Permissions' => 'Access control rules (' . Role::count() . ' roles, ' . DB::table('permissions')->count() . ' permissions) remain fully intact.',
             'Product & Spare Parts Catalogue' => 'Master product definitions (' . Product::count() . ' products, ' . InventoryItem::count() . ' catalog items) are retained.',
             'Company & GST Settings' => 'Official trade name, GSTIN, bank settlement details and invoice terms are preserved.',
@@ -149,21 +155,10 @@ class DataCleanupService
         $deletedCounts = [];
 
         DB::transaction(function () use ($actingUser, &$deletedCounts) {
-            // 1. Technician Operational Activity & Locations
+            // 1. Technician Operational Activity, Locations & Portal Access
             $deletedCounts['technician_locations'] = TechnicianLocation::query()->delete();
             $deletedCounts['technician_portal_notifications'] = DB::table('technician_portal_notifications')->delete();
-
-            // Reset technician dispatch state to IDLE without deleting the technician master profiles
-            Technician::query()->update([
-                'active_service_id' => null,
-                'tracking_status' => 'IDLE',
-                'destination_latitude' => null,
-                'destination_longitude' => null,
-                'destination_address' => null,
-                'distance_km' => null,
-                'eta_minutes' => null,
-                'last_ping_at' => null,
-            ]);
+            $deletedCounts['technician_portal_access'] = DB::table('technician_portal_access')->delete();
 
             // 2. Job Cards
             $deletedCounts['job_cards'] = JobCard::query()->delete();
@@ -171,6 +166,27 @@ class DataCleanupService
             // 3. Services & Service Schedules
             $deletedCounts['service_schedules'] = ServiceSchedule::query()->delete();
             $deletedCounts['services'] = Service::query()->delete();
+
+            // 4. Technicians Master Records & Dedicated Technician Accounts
+            $techUserIds = Technician::whereNotNull('user_id')->pluck('user_id')->filter()->values()->toArray();
+            $deletedCounts['technicians'] = Technician::query()->delete();
+
+            if (!empty($techUserIds)) {
+                User::whereIn('id', $techUserIds)
+                    ->where('role', 'Technician')
+                    ->where('role', '!=', 'Super Admin')
+                    ->delete();
+            }
+            User::where('role', 'Technician')->delete();
+
+            // Clear Maps tracking cache
+            try {
+                if (class_exists(\App\Services\MapsTrackingService::class)) {
+                    app(\App\Services\MapsTrackingService::class)->clearAllTrackingCache();
+                }
+            } catch (\Throwable $e) {
+                // Ignore cache clearing failure
+            }
 
             // 4. Warranties & Warranty Events
             $deletedCounts['warranty_events'] = WarrantyEvent::query()->delete();

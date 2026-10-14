@@ -548,6 +548,21 @@ class MapsTrackingService
     }
 
     /**
+     * Clear all active tracking caches and sets across the system
+     */
+    public function clearAllTrackingCache(): void
+    {
+        $activeIds = Cache::get(self::KEY_ACTIVE_SET, []);
+        if (is_array($activeIds)) {
+            foreach ($activeIds as $techId) {
+                Cache::forget(self::KEY_PREFIX_LOCATION . $techId);
+                Cache::forget(self::KEY_PREFIX_DESTINATION . $techId);
+            }
+        }
+        Cache::forget(self::KEY_ACTIVE_SET);
+    }
+
+    /**
      * Get all active and roster technicians for Admin Live Map
      */
     public function getAllActiveLocations(): array

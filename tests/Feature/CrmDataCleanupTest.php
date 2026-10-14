@@ -113,6 +113,7 @@ class CrmDataCleanupTest extends TestCase
                     'warranties',
                     'rentals',
                     'inventory_transactions',
+                    'technicians',
                     'technician_activity',
                     'inquiries_leads',
                     'operational_notifications',
@@ -448,11 +449,10 @@ class CrmDataCleanupTest extends TestCase
         $this->assertGreaterThan(0, InventoryItem::count());
         $this->assertEquals(0, InventoryItem::sum('current_stock'));
 
-        // 6. Technicians roster preserved with dispatch state reset to IDLE
-        $this->assertGreaterThan(0, Technician::count());
-        $freshTech = Technician::first();
-        $this->assertEquals('IDLE', $freshTech->tracking_status);
-        $this->assertNull($freshTech->active_service_id);
+        // 6. Technicians roster, portal access and technician accounts are strictly removed
+        $this->assertEquals(0, Technician::count(), 'Technicians table must be empty');
+        $this->assertEquals(0, DB::table('technician_portal_access')->count(), 'Technician portal access table must be empty');
+        $this->assertEquals(0, User::where('role', 'Technician')->count(), 'Technician user accounts must be removed');
 
         // 7. Sequences reset to 0
         $custSeq = BusinessSequence::where('name', 'CUSTOMER')->first();
