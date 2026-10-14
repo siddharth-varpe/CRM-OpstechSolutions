@@ -19,19 +19,27 @@
     </div>
 
     <!-- Quick Location Search Bar & Geocoding -->
-    <div class="flex items-center gap-1.5">
-        <div class="relative flex-1">
-            <input type="text" id="{{ $p }}_search_input" placeholder="Search locality, society, building or area..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
-            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+    <div class="space-y-1.5">
+        <div class="flex items-center gap-1.5">
+            <div class="relative flex-1">
+                <input type="text" id="{{ $p }}_search_input" placeholder="Search locality, area, landmark, society, building..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+            </div>
+            <button type="button" id="{{ $p }}_btn_locate" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0" title="Locate typed address on map">
+                <i data-lucide="navigation" class="w-3.5 h-3.5 text-sky-600"></i>
+                <span>Locate Address</span>
+            </button>
+            <button type="button" id="{{ $p }}_btn_gps" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0" title="Use current device GPS">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5 text-slate-600"></i>
+                <span class="hidden sm:inline">My GPS</span>
+            </button>
         </div>
-        <button type="button" id="{{ $p }}_btn_locate" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0" title="Locate typed address on map">
-            <i data-lucide="navigation" class="w-3.5 h-3.5 text-sky-600"></i>
-            <span>Locate Address</span>
-        </button>
-        <button type="button" id="{{ $p }}_btn_gps" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0" title="Use current device GPS">
-            <i data-lucide="crosshair" class="w-3.5 h-3.5 text-slate-600"></i>
-            <span class="hidden sm:inline">My GPS</span>
-        </button>
+
+        <!-- Inline Status / Feedback Notification -->
+        <div id="{{ $p }}_search_feedback" class="hidden"></div>
+
+        <!-- Multiple Match Suggestions Dropdown / Chip List -->
+        <div id="{{ $p }}_suggestions_box" class="hidden"></div>
     </div>
 
     <!-- Map Canvas Container -->
@@ -83,6 +91,8 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     const locateBtn = document.getElementById(p + '_btn_locate');
     const gpsBtn = document.getElementById(p + '_btn_gps');
     const recenterBtn = document.getElementById(p + '_btn_recenter');
+    const feedbackEl = document.getElementById(p + '_search_feedback');
+    const suggestionsEl = document.getElementById(p + '_suggestions_box');
 
     function updateBadge(type, text) {
         if (!badge) return;
@@ -90,6 +100,35 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
             (type === 'exact' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
             (type === 'geocoded' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'));
         badge.innerText = text;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showFeedback(type, title, message) {
+        if (!feedbackEl) return;
+        feedbackEl.className = 'text-xs p-2 rounded-lg border flex items-start justify-between gap-1.5 ' +
+            (type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
+            (type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-800'));
+        feedbackEl.innerHTML = `
+            <div class="flex items-start gap-1.5 flex-1">
+                <i data-lucide="${type === 'success' ? 'check-circle-2' : (type === 'warning' ? 'alert-triangle' : 'info')}" class="w-3.5 h-3.5 mt-0.5 shrink-0 ${type === 'success' ? 'text-emerald-600' : (type === 'warning' ? 'text-amber-600' : 'text-slate-500')}"></i>
+                <div class="leading-tight">
+                    <span class="font-bold text-[11px]">${escapeHtml(title)}</span>
+                    <span class="text-[10px] text-slate-600 ml-1">${escapeHtml(message)}</span>
+                </div>
+            </div>
+            <button type="button" class="text-slate-400 hover:text-slate-600 text-xs px-1 font-bold" onclick="document.getElementById('${p}_search_feedback').classList.add('hidden')">&times;</button>
+        `;
+        feedbackEl.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function hideFeedback() {
+        if (feedbackEl) feedbackEl.classList.add('hidden');
+        if (suggestionsEl) suggestionsEl.classList.add('hidden');
     }
 
     function setCoordinates(lat, lng, badgeType = 'exact', badgeText = 'Verified Exact Pin') {
@@ -155,10 +194,12 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     marker.on('dragend', function(e) {
         const pos = marker.getLatLng();
         setCoordinates(pos.lat, pos.lng, 'exact', 'Verified Exact Pin');
+        hideFeedback();
     });
 
     map.on('click', function(e) {
         setCoordinates(e.latlng.lat, e.latlng.lng, 'exact', 'Verified Exact Pin');
+        hideFeedback();
     });
 
     // Manual Coordinate inputs change
@@ -188,7 +229,7 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     if (gpsBtn) {
         gpsBtn.addEventListener('click', function() {
             if (!navigator.geolocation) {
-                alert('Geolocation is not supported by your browser.');
+                showFeedback('warning', 'GPS Unavailable:', 'Geolocation is not supported by your browser.');
                 return;
             }
             gpsBtn.disabled = true;
@@ -200,12 +241,13 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
                 gpsBtn.innerHTML = '<i data-lucide="crosshair" class="w-3.5 h-3.5 text-slate-600"></i><span class="hidden sm:inline">My GPS</span>';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
                 setCoordinates(pos.coords.latitude, pos.coords.longitude, 'exact', 'Verified Device GPS');
-                map.setView([pos.coords.latitude, pos.coords.longitude], 17);
+                map.flyTo([pos.coords.latitude, pos.coords.longitude], 17, { animate: true, duration: 1.0 });
+                showFeedback('success', 'GPS Acquired:', 'Pin set to current device location. Drag pin if needed to refine entrance.');
             }, function(err) {
                 gpsBtn.disabled = false;
                 gpsBtn.innerHTML = '<i data-lucide="crosshair" class="w-3.5 h-3.5 text-slate-600"></i><span class="hidden sm:inline">My GPS</span>';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
-                alert('Could not acquire device GPS location: ' + err.message);
+                showFeedback('warning', 'GPS Error:', 'Could not acquire device GPS: ' + err.message);
             }, { enableHighAccuracy: true, timeout: 10000 });
         });
     }
@@ -214,16 +256,21 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
     function performSearch() {
         let q = searchInput ? searchInput.value.trim() : '';
         if (!q && config.getAddressString) {
-            q = config.getAddressString();
+            q = config.getAddressString().trim();
+            if (q && searchInput) {
+                searchInput.value = q;
+            }
         }
         if (!q) {
-            alert('Please enter an address or locality to search.');
+            showFeedback('warning', 'Address Required:', 'Please enter an address or locality in the search bar.');
+            if (searchInput) searchInput.focus();
             return;
         }
 
+        hideFeedback();
         if (locateBtn) {
             locateBtn.disabled = true;
-            locateBtn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Finding...';
+            locateBtn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Locating...';
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
@@ -233,15 +280,50 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
             data: { query: q },
             success: function(res) {
                 if (res && res.success && res.latitude && res.longitude) {
-                    setCoordinates(res.latitude, res.longitude, 'geocoded', 'Geocoded (Please adjust pin to entrance)');
-                    map.setView([res.latitude, res.longitude], 16);
+                    setCoordinates(res.latitude, res.longitude, 'geocoded', 'Located Area (Adjust pin to entrance)');
+                    if (picker.map) {
+                        picker.map.flyTo([res.latitude, res.longitude], 16, { animate: true, duration: 1.0 });
+                    }
+                    showFeedback('success', 'Area Located:', (res.display_name || res.matched_term) + ' — Now drag the red pin or click map to set exact premise entrance.');
+
+                    // Render suggestion chips if multiple results found
+                    if (suggestionsEl && res.results && res.results.length > 1) {
+                        suggestionsEl.className = 'p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 text-xs';
+                        let chipsHtml = '<div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Alternate Matches / Specific Landmarks:</div><div class="flex flex-wrap gap-1">';
+                        res.results.forEach(function(item) {
+                            const parts = (item.display_name || '').split(',');
+                            const shortLabel = parts.slice(0, 3).join(', ');
+                            const typeTag = item.type ? ` (${item.type})` : '';
+                            chipsHtml += `<button type="button" class="${p}_suggestion_btn px-2 py-1 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-800 rounded text-[10px] font-medium transition text-left cursor-pointer" data-lat="${item.latitude}" data-lng="${item.longitude}" data-name="${escapeHtml(item.display_name)}">
+                                📍 ${escapeHtml(shortLabel)}<span class="text-slate-400 text-[9px]">${escapeHtml(typeTag)}</span>
+                            </button>`;
+                        });
+                        chipsHtml += '</div>';
+                        suggestionsEl.innerHTML = chipsHtml;
+                        suggestionsEl.classList.remove('hidden');
+
+                        // Attach click handlers to chips
+                        suggestionsEl.querySelectorAll('.' + p + '_suggestion_btn').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                                const bLat = parseFloat(this.getAttribute('data-lat'));
+                                const bLng = parseFloat(this.getAttribute('data-lng'));
+                                const bName = this.getAttribute('data-name');
+                                setCoordinates(bLat, bLng, 'geocoded', 'Located Area (Adjust pin to entrance)');
+                                if (picker.map) {
+                                    picker.map.flyTo([bLat, bLng], 17, { animate: true, duration: 0.8 });
+                                }
+                                showFeedback('success', 'Jumped to:', bName + ' — Now drag the pin to pinpoint customer entrance.');
+                                suggestionsEl.classList.add('hidden');
+                            });
+                        });
+                    }
                 } else {
-                    alert('Could not locate coordinates for this address. You can position the pin manually on the map.');
+                    showFeedback('warning', 'Location Not Found:', 'Could not locate coordinates. You can drag or click the map to place the pin manually.');
                 }
             },
             error: function(xhr) {
                 const msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Address not found. Please click on the map to place the pin manually.';
-                alert(msg);
+                showFeedback('warning', 'Not Found:', msg);
             },
             complete: function() {
                 if (locateBtn) {
@@ -261,6 +343,14 @@ window.initLocationPicker = window.initLocationPicker || function(config) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 performSearch();
+            }
+        });
+        searchInput.addEventListener('focus', function() {
+            if (!this.value.trim() && config.getAddressString) {
+                const autoStr = config.getAddressString().trim();
+                if (autoStr) {
+                    this.value = autoStr;
+                }
             }
         });
     }

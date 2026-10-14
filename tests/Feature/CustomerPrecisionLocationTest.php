@@ -386,4 +386,49 @@ class CustomerPrecisionLocationTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['latitude', 'longitude']);
     }
+
+    /**
+     * Test G: Geocoding endpoint rejects empty queries
+     */
+    public function test_geocode_endpoint_rejects_empty_query(): void
+    {
+        $response = $this->actingAs($this->adminUser)->getJson(route('customers.geocode', ['query' => '']));
+        $response->assertStatus(422);
+        $response->assertJson(['success' => false]);
+    }
+
+    /**
+     * Test H: Geocoding endpoint resolves decomposed Indian address candidates
+     */
+    public function test_geocode_endpoint_resolves_decomposed_address(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+
+        \Illuminate\Support\Facades\Http::fake(function (\Illuminate\Http\Client\Request $request) {
+            $url = $request->url();
+            if (str_contains($url, 'nominatim') && str_contains(urldecode($url), 'pimple')) {
+                return \Illuminate\Support\Facades\Http::response([
+                    [
+                        'lat' => '18.5874457',
+                        'lon' => '73.8213076',
+                        'display_name' => 'Pimple Gurav, Pimpri-Chinchwad, Pune',
+                        'type' => 'suburb',
+                    ]
+                ], 200);
+            }
+            return \Illuminate\Support\Facades\Http::response([], 200);
+        });
+
+        $response = $this->actingAs($this->adminUser)->getJson(route('customers.geocode', [
+            'query' => 'akash kiran apartment phase 2, pimple gurav'
+        ]));
+
+        $response->assertStatus(200);
+        $json = $response->json();
+        $this->assertTrue($json['success']);
+        $this->assertEqualsWithDelta(18.5874457, (float) $json['latitude'], 0.0001);
+        $this->assertEqualsWithDelta(73.8213076, (float) $json['longitude'], 0.0001);
+        $this->assertStringContainsString('pimple gurav', strtolower($json['matched_term']));
+        $this->assertNotEmpty($json['results']);
+    }
 }

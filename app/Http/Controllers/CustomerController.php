@@ -420,36 +420,187 @@ class CustomerController extends Controller
             return response()->json($cached);
         }
 
-        // Try Nominatim geocoder
-        try {
-            $response = \Illuminate\Support\Facades\Http::withHeaders([
-                'User-Agent' => 'EnterprisesCRM/1.0',
-            ])->timeout(4)->get('https://nominatim.openstreetmap.org/search', [
-                'q' => $query,
-                'format' => 'json',
-                'limit' => 1,
-            ]);
+        $candidates = $this->buildGeocodeCandidates($query);
+        $allMatches = [];
 
-            if ($response->successful() && !empty($response->json())) {
-                $item = $response->json()[0];
-                $data = [
-                    'success' => true,
-                    'latitude' => (float) $item['lat'],
-                    'longitude' => (float) $item['lon'],
-                    'display_name' => $item['display_name'] ?? $query,
-                    'is_approximate' => true,
-                ];
-                \Illuminate\Support\Facades\Cache::put($cacheKey, $data, 86400);
-                return response()->json($data);
+        foreach ($candidates as $candidate) {
+            // 1. Try Nominatim (OpenStreetMap)
+            try {
+                $response = \Illuminate\Support\Facades\Http::withHeaders([
+                    'User-Agent' => 'EnterprisesCRM/1.0',
+                ])->timeout(2.5)->get('https://nominatim.openstreetmap.org/search', [
+                    'q' => $candidate,
+                    'format' => 'json',
+                    'limit' => 3,
+                ]);
+
+                if ($response->successful() && !empty($response->json())) {
+                    foreach ($response->json() as $item) {
+                        $allMatches[] = [
+                            'latitude' => (float) $item['lat'],
+                            'longitude' => (float) $item['lon'],
+                            'display_name' => $item['display_name'] ?? $candidate,
+                            'matched_term' => $candidate,
+                            'type' => $item['type'] ?? 'place',
+                        ];
+                    }
+                    break; // Stop after highest-priority candidate with direct match
+                }
+            } catch (\Throwable $e) {
+                // Continue to Photon or next candidate
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("Geocode lookup failed for '{$query}': " . $e->getMessage());
+
+            // 2. Try Photon (Komoot OSM Geocoder with Pune coordinate bias)
+            try {
+                $photonRes = \Illuminate\Support\Facades\Http::timeout(2.5)
+                    ->get('https://photon.komoot.io/api/', [
+                        'q' => $candidate,
+                        'lat' => 18.5204,
+                        'lon' => 73.8567,
+                        'limit' => 5,
+                    ]);
+
+                if ($photonRes->successful() && !empty($photonRes->json()['features'])) {
+                    foreach ($photonRes->json()['features'] as $feat) {
+                        $props = $feat['properties'] ?? [];
+                        $coords = $feat['geometry']['coordinates'] ?? [];
+                        if (count($coords) >= 2) {
+                            $nameParts = array_filter([
+                                $props['name'] ?? null,
+                                $props['street'] ?? null,
+                                $props['district'] ?? null,
+                                $props['locality'] ?? null,
+                                $props['city'] ?? null,
+                                $props['state'] ?? null,
+                            ]);
+                            $displayName = !empty($nameParts) ? implode(', ', $nameParts) : ($props['name'] ?? $candidate);
+
+                            $allMatches[] = [
+                                'latitude' => (float) $coords[1],
+                                'longitude' => (float) $coords[0],
+                                'display_name' => $displayName,
+                                'matched_term' => $candidate,
+                                'type' => $props['type'] ?? ($props['osm_value'] ?? 'place'),
+                            ];
+                        }
+                    }
+                    if (!empty($allMatches)) {
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Continue
+            }
+        }
+
+        if (!empty($allMatches)) {
+            // Deduplicate proximate coordinates
+            $uniqueMatches = [];
+            foreach ($allMatches as $match) {
+                $isDup = false;
+                foreach ($uniqueMatches as $um) {
+                    if (abs($um['latitude'] - $match['latitude']) < 0.0005 &&
+                        abs($um['longitude'] - $match['longitude']) < 0.0005) {
+                        $isDup = true;
+                        break;
+                    }
+                }
+                if (!$isDup) {
+                    $uniqueMatches[] = $match;
+                }
+            }
+
+            $primary = $uniqueMatches[0];
+            $data = [
+                'success' => true,
+                'latitude' => $primary['latitude'],
+                'longitude' => $primary['longitude'],
+                'display_name' => $primary['display_name'],
+                'matched_term' => $primary['matched_term'],
+                'is_approximate' => true,
+                'results' => array_slice($uniqueMatches, 0, 5),
+            ];
+
+            \Illuminate\Support\Facades\Cache::put($cacheKey, $data, 86400);
+            return response()->json($data);
         }
 
         return response()->json([
             'success' => false,
             'message' => 'No coordinates found for this address. Please place or adjust the pin manually on the map.',
         ], 404);
+    }
+
+    /**
+     * Build prioritized candidate search strings from raw Indian customer address strings
+     */
+    protected function buildGeocodeCandidates(string $raw): array
+    {
+        $raw = trim($raw);
+        if (empty($raw)) {
+            return [];
+        }
+
+        $candidates = [];
+        $hasCity = (bool) preg_match('/\b(pune|pimpr[i\-]|chinchwad|haveli|pcmc)\b/i', $raw);
+
+        // 1. Exact raw query
+        $candidates[] = $raw;
+        if (!$hasCity) {
+            $candidates[] = $raw . ', Pune';
+        }
+
+        $noisePattern = '/\b(flat|shop|office|unit|room|block|apt|apartment|phase|sector|sec|plot|survey\s*no|sr\s*no|house\s*no|s\s*no|near|opp|opposite|behind|beside)\s*[:#\.\-\s]*[\w\d\-]+/i';
+
+        // Split into segments by comma/slash/semicolon
+        $segments = array_values(array_filter(array_map(function ($s) {
+            return trim(preg_replace('/\s+/', ' ', $s));
+        }, preg_split('/[,;\/]+/', $raw))));
+
+        $segCount = count($segments);
+
+        // 2. If multiple segments, extract the primary locality
+        if ($segCount > 1) {
+            $last = $segments[$segCount - 1];
+            $isLastCity = (bool) preg_match('/\b(pune|pimpr[i\-]|chinchwad|pcmc|maharashtra|india)\b/i', $last);
+            $locality = ($isLastCity && $segCount > 2) ? $segments[$segCount - 2] : $last;
+
+            $cleanedLocality = trim(preg_replace('/\s+/', ' ', preg_replace($noisePattern, ' ', $locality)));
+            if (!empty($cleanedLocality)) {
+                $candidates[] = $cleanedLocality . ($hasCity ? '' : ', Pune');
+                $candidates[] = $cleanedLocality;
+            }
+
+            // Combinations of locality with prior segment or city
+            if ($segCount >= 2) {
+                $right2 = implode(', ', array_slice($segments, -2));
+                $candidates[] = $right2;
+                if (!$hasCity && !preg_match('/\b(pune|pcmc)\b/i', $right2)) {
+                    $candidates[] = $right2 . ', Pune';
+                }
+            }
+        }
+
+        // 3. Cleaned raw query without noise words (e.g. flat, phase, apt)
+        $cleanedRaw = trim(preg_replace('/\s+/', ' ', preg_replace($noisePattern, ' ', $raw)));
+        $cleanedRaw = trim(preg_replace('/^[, \-]+|[, \-]+$/', '', $cleanedRaw));
+        if (!empty($cleanedRaw) && strtolower($cleanedRaw) !== strtolower($raw)) {
+            $candidates[] = $cleanedRaw;
+            if (!$hasCity && !preg_match('/\b(pune|pcmc)\b/i', $cleanedRaw)) {
+                $candidates[] = $cleanedRaw . ', Pune';
+            }
+        }
+
+        // Deduplicate
+        $unique = [];
+        foreach ($candidates as $c) {
+            $k = strtolower(trim($c));
+            if ($k !== '' && !isset($unique[$k])) {
+                $unique[$k] = trim($c);
+            }
+        }
+
+        return array_values($unique);
     }
 
     /**
