@@ -227,10 +227,15 @@
 
                             <!-- Portal Access Badge -->
                             <td class="py-3.5 px-4 text-center">
-                                @if($tech->portalAccess && $tech->portalAccess->portal_enabled)
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-                                        <i data-lucide="check" class="w-3 h-3"></i>
-                                        ENABLED
+                                @if($tech->portalAccess && $tech->portalAccess->portal_enabled && !empty($tech->portalAccess->pin_hash))
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono" title="Unique PIN Configured">
+                                        <i data-lucide="shield-check" class="w-3 h-3"></i>
+                                        PIN ACTIVE
+                                    </span>
+                                @elseif($tech->portalAccess && $tech->portalAccess->portal_enabled)
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 font-mono" title="PIN Not Yet Assigned">
+                                        <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+                                        NO PIN
                                     </span>
                                 @else
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 font-mono">
@@ -372,8 +377,8 @@
                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mobile PIN (4-digit)</label>
-                    <input type="password" name="portal_pin" maxlength="6" placeholder="Default: 1234"
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Assign Portal PIN (4-6 digits) *</label>
+                    <input type="password" name="portal_pin" required minlength="4" maxlength="6" placeholder="Assign unique PIN (e.g. 5821)"
                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
                 </div>
             </div>

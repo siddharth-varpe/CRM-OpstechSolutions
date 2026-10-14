@@ -138,6 +138,8 @@ class CustomerController extends Controller
             'city' => 'required|string|max:100',
             'state' => 'required|string|max:100',
             'postal_code' => 'required|string|max:20',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
@@ -158,6 +160,9 @@ class CustomerController extends Controller
                 'created_by' => auth()->id(),
             ]);
 
+            $lat = ($request->filled('latitude') && (float)$validated['latitude'] != 0.0) ? (float)$validated['latitude'] : null;
+            $lng = ($request->filled('longitude') && (float)$validated['longitude'] != 0.0) ? (float)$validated['longitude'] : null;
+
             CustomerAddress::create([
                 'customer_id' => $customer->id,
                 'address_type' => 'BOTH',
@@ -167,6 +172,8 @@ class CustomerController extends Controller
                 'city' => $validated['city'],
                 'state' => $validated['state'],
                 'postal_code' => $validated['postal_code'],
+                'latitude' => $lat,
+                'longitude' => $lng,
                 'is_default' => true,
             ]);
 
@@ -186,7 +193,7 @@ class CustomerController extends Controller
     }
 
     /**
-     * Update customer profile
+     * Update customer profile and address coordinates
      */
     public function update(Request $request, $id)
     {
@@ -202,20 +209,75 @@ class CustomerController extends Controller
             'status' => 'required|in:ACTIVE,INACTIVE',
             'customer_label' => 'nullable|in:GOOD,BAD',
             'notes' => 'nullable|string',
+            // Primary address fields (optional in update, but updated if provided)
+            'address_line1' => 'nullable|string|max:255',
+            'address_line2' => 'nullable|string|max:255',
+            'landmark' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:100',
+            'state' => 'nullable|string|max:100',
+            'postal_code' => 'nullable|string|max:20',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
-        $customer->update($validated);
+        $customer->update([
+            'full_name' => $validated['full_name'],
+            'phone' => $validated['phone'],
+            'email' => $validated['email'] ?? null,
+            'customer_type' => $validated['customer_type'],
+            'company_name' => $validated['company_name'] ?? null,
+            'gst_number' => $validated['gst_number'] ?? null,
+            'status' => $validated['status'],
+            'customer_label' => $validated['customer_label'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $hasAddressInput = $request->has('address_line1') || $request->has('latitude') || $request->has('longitude') || $request->has('city');
+        if ($hasAddressInput) {
+            $primaryAddr = $customer->primaryAddress ?? $customer->addresses->first();
+            $addrData = [];
+            if ($request->filled('address_line1')) $addrData['address_line1'] = $validated['address_line1'];
+            if ($request->has('address_line2')) $addrData['address_line2'] = $validated['address_line2'] ?? null;
+            if ($request->has('landmark')) $addrData['landmark'] = $validated['landmark'] ?? null;
+            if ($request->filled('city')) $addrData['city'] = $validated['city'];
+            if ($request->filled('state')) $addrData['state'] = $validated['state'];
+            if ($request->filled('postal_code')) $addrData['postal_code'] = $validated['postal_code'];
+
+            if ($request->has('latitude')) {
+                $addrData['latitude'] = ($request->filled('latitude') && (float)$validated['latitude'] != 0.0) ? (float)$validated['latitude'] : null;
+            }
+            if ($request->has('longitude')) {
+                $addrData['longitude'] = ($request->filled('longitude') && (float)$validated['longitude'] != 0.0) ? (float)$validated['longitude'] : null;
+            }
+
+            if ($primaryAddr) {
+                $primaryAddr->update($addrData);
+            } else {
+                $addrData['customer_id'] = $customer->id;
+                $addrData['address_type'] = 'BOTH';
+                $addrData['address_line1'] = $addrData['address_line1'] ?? 'Default Address';
+                $addrData['city'] = $addrData['city'] ?? 'Pune';
+                $addrData['state'] = $addrData['state'] ?? 'Maharashtra';
+                $addrData['postal_code'] = $addrData['postal_code'] ?? '411001';
+                $addrData['is_default'] = true;
+                $primaryAddr = CustomerAddress::create($addrData);
+            }
+
+            // Sync active navigation destination coordinates if active navigation exists for this customer
+            $this->syncActiveNavigationsForCustomer($customer->id, $primaryAddr);
+        }
+
         AuditLog::log('UPDATE', 'CUSTOMER', $customer->id, null, $validated);
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Customer profile updated successfully.',
+                'message' => 'Customer profile and destination coordinates updated successfully.',
                 'reload' => true,
             ]);
         }
 
-        return back()->with('success', 'Customer profile updated successfully.');
+        return back()->with('success', 'Customer profile and destination coordinates updated successfully.');
     }
 
     /**
@@ -245,12 +307,17 @@ class CustomerController extends Controller
             'city' => 'required|string|max:100',
             'state' => 'required|string|max:100',
             'postal_code' => 'required|string|max:20',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'is_default' => 'nullable|boolean',
         ]);
 
         if (!empty($validated['is_default'])) {
             CustomerAddress::where('customer_id', $customer->id)->update(['is_default' => false]);
         }
+
+        $lat = ($request->filled('latitude') && (float)$validated['latitude'] != 0.0) ? (float)$validated['latitude'] : null;
+        $lng = ($request->filled('longitude') && (float)$validated['longitude'] != 0.0) ? (float)$validated['longitude'] : null;
 
         $address = CustomerAddress::create([
             'customer_id' => $customer->id,
@@ -261,10 +328,167 @@ class CustomerController extends Controller
             'city' => $validated['city'],
             'state' => $validated['state'],
             'postal_code' => $validated['postal_code'],
+            'latitude' => $lat,
+            'longitude' => $lng,
             'is_default' => $request->boolean('is_default'),
         ]);
 
+        if ($address->is_default) {
+            $this->syncActiveNavigationsForCustomer($customer->id, $address);
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'New address with destination coordinates added successfully.',
+                'address' => $address,
+            ]);
+        }
+
         return back()->with('success', 'New address added successfully.');
+    }
+
+    /**
+     * Update customer address and destination coordinates
+     */
+    public function updateAddress(Request $request, $customerId, $addressId)
+    {
+        $customer = Customer::findOrFail($customerId);
+        $address = CustomerAddress::where('customer_id', $customer->id)->findOrFail($addressId);
+
+        $validated = $request->validate([
+            'address_type' => 'nullable|in:BILLING,SERVICE,BOTH',
+            'address_line1' => 'required|string|max:255',
+            'address_line2' => 'nullable|string|max:255',
+            'landmark' => 'nullable|string|max:255',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'postal_code' => 'required|string|max:20',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'is_default' => 'nullable|boolean',
+        ]);
+
+        if (!empty($validated['is_default'])) {
+            CustomerAddress::where('customer_id', $customer->id)->where('id', '!=', $address->id)->update(['is_default' => false]);
+        }
+
+        $lat = ($request->filled('latitude') && (float)$validated['latitude'] != 0.0) ? (float)$validated['latitude'] : null;
+        $lng = ($request->filled('longitude') && (float)$validated['longitude'] != 0.0) ? (float)$validated['longitude'] : null;
+
+        $address->update([
+            'address_type' => $validated['address_type'] ?? $address->address_type,
+            'address_line1' => $validated['address_line1'],
+            'address_line2' => $validated['address_line2'] ?? null,
+            'landmark' => $validated['landmark'] ?? null,
+            'city' => $validated['city'],
+            'state' => $validated['state'],
+            'postal_code' => $validated['postal_code'],
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'is_default' => $request->has('is_default') ? $request->boolean('is_default') : $address->is_default,
+        ]);
+
+        if ($address->is_default || $customer->addresses->count() === 1) {
+            $this->syncActiveNavigationsForCustomer($customer->id, $address);
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer address and destination coordinates updated successfully.',
+                'address' => $address,
+            ]);
+        }
+
+        return back()->with('success', 'Customer address and destination coordinates updated successfully.');
+    }
+
+    /**
+     * Address geocoding helper for search and pinpointing
+     */
+    public function geocodeAddress(Request $request)
+    {
+        $query = trim((string)$request->input('query', $request->input('address', '')));
+        if (empty($query)) {
+            return response()->json(['success' => false, 'message' => 'Address query is required'], 422);
+        }
+
+        $cacheKey = 'geocode:' . md5(strtolower($query));
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if ($cached) {
+            return response()->json($cached);
+        }
+
+        // Try Nominatim geocoder
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'User-Agent' => 'EnterprisesCRM/1.0',
+            ])->timeout(4)->get('https://nominatim.openstreetmap.org/search', [
+                'q' => $query,
+                'format' => 'json',
+                'limit' => 1,
+            ]);
+
+            if ($response->successful() && !empty($response->json())) {
+                $item = $response->json()[0];
+                $data = [
+                    'success' => true,
+                    'latitude' => (float) $item['lat'],
+                    'longitude' => (float) $item['lon'],
+                    'display_name' => $item['display_name'] ?? $query,
+                    'is_approximate' => true,
+                ];
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $data, 86400);
+                return response()->json($data);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Geocode lookup failed for '{$query}': " . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'No coordinates found for this address. Please place or adjust the pin manually on the map.',
+        ], 404);
+    }
+
+    /**
+     * Helper to synchronize active technician navigations if customer destination coordinates are updated
+     */
+    protected function syncActiveNavigationsForCustomer(string $customerId, CustomerAddress $address): void
+    {
+        try {
+            $mapsTrackingService = app(\App\Services\MapsTrackingService::class);
+            $serviceIds = \App\Models\Service::where('customer_id', $customerId)
+                ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS', 'SCHEDULED'])
+                ->pluck('id')
+                ->toArray();
+
+            if (empty($serviceIds)) {
+                return;
+            }
+
+            $technicians = \App\Models\Technician::whereIn('active_service_id', $serviceIds)->get();
+
+            foreach ($technicians as $tech) {
+                $techId = (string) $tech->id;
+                $activeDest = $mapsTrackingService->getActiveDestination($techId);
+                if ($activeDest && in_array($activeDest['serviceId'] ?? '', $serviceIds)) {
+                    $activeDest['latitude'] = $address->latitude ? (float) $address->latitude : null;
+                    $activeDest['longitude'] = $address->longitude ? (float) $address->longitude : null;
+                    $activeDest['address'] = $address->full_address;
+                    $mapsTrackingService->setActiveDestination($techId, $activeDest);
+                }
+
+                $tech->update([
+                    'destination_latitude' => $address->latitude,
+                    'destination_longitude' => $address->longitude,
+                    'destination_address' => $address->full_address,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to sync active navigation for customer {$customerId}: " . $e->getMessage());
+        }
     }
 
     /**

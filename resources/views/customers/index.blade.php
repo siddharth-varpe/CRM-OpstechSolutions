@@ -20,7 +20,7 @@
                 <i data-lucide="upload" class="w-4 h-4 text-slate-500"></i>
                 <span>Import Customers</span>
             </button>
-            <button type="button" onclick="openModal('add-customer-modal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors">
+            <button type="button" onclick="openAddCustomerModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors cursor-pointer">
                 <i data-lucide="user-plus" class="w-4 h-4"></i>
                 <span>+ Add Customer</span>
             </button>
@@ -261,6 +261,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Precision Destination Coordinates Map Picker -->
+            @include('customers.partials.location_picker', ['prefix' => 'customer_create'])
 
             <!-- Notes -->
             <div>
@@ -535,11 +538,36 @@ function resetCustomerImportModal() {
     }
 }
 
+function openAddCustomerModal() {
+    openModal('add-customer-modal');
+    setTimeout(function() {
+        if (!window.locationPicker_customer_create) {
+            window.initLocationPicker({
+                prefix: 'customer_create',
+                getAddressString: function() {
+                    const form = document.querySelector('#add-customer-modal form');
+                    if (!form) return '';
+                    const parts = [
+                        form.querySelector('[name="address_line1"]')?.value,
+                        form.querySelector('[name="address_line2"]')?.value,
+                        form.querySelector('[name="landmark"]')?.value,
+                        form.querySelector('[name="city"]')?.value,
+                        form.querySelector('[name="postal_code"]')?.value
+                    ].filter(Boolean);
+                    return parts.join(', ');
+                }
+            });
+        } else {
+            window.locationPicker_customer_create.invalidate();
+        }
+    }, 200);
+}
+
 $(document).ready(function() {
     // If query string ?action=create, automatically open the modal
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('action') === 'create') {
-        openModal('add-customer-modal');
+        openAddCustomerModal();
     }
 
     const $drop = $('#importDropZone');

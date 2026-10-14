@@ -62,7 +62,7 @@ class PartialPaymentNextDueDateTest extends TestCase
         $response = $this->post(route('invoices.store'), $payload);
         $response->assertSessionHasNoErrors();
 
-        $invoice = Invoice::orderByDesc('id')->first();
+        $invoice = Invoice::where('customer_id', $this->customer->id)->orderByDesc('invoice_number')->first();
         $this->assertNotNull($invoice);
         $this->assertEquals(5000.00, (float) $invoice->subtotal);
         $this->assertEquals(0.00, (float) $invoice->tax_amount);

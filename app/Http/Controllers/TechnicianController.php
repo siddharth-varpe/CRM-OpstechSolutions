@@ -8,6 +8,7 @@ use App\Models\TechnicianPortalAccess;
 use App\Models\Service;
 use App\Models\JobCard;
 use App\Models\AuditLog;
+use App\Services\MapsTrackingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -320,133 +321,101 @@ class TechnicianController extends Controller
      * GET /maps/admin/live-technicians
      * Real-time GPS snapshot of all technicians, locations, and active routes
      */
-    public function liveTechnicians(Request $request)
-    {
-        $technicians = Technician::with(['activeService.customer.addresses', 'activeService.jobCard'])
-            ->get();
+     public function liveTechnicians(Request $request, MapsTrackingService $mapsTrackingService)
+     {
+         $result = $mapsTrackingService->getAllActiveLocations();
 
-        $result = [];
+         return response()->json([
+             'success' => true,
+             'data' => $result,
+         ]);
+     }
 
-        foreach ($technicians as $t) {
-            $hasCoords = ($t->current_latitude !== null && $t->current_longitude !== null);
-            $hasDest = ($t->destination_latitude !== null && $t->destination_longitude !== null);
+     /**
+      * GET /maps/admin/config
+      */
+     public function mapsConfig()
+     {
+         return response()->json([
+             'success' => true,
+             'data' => [
+                 'apiKey' => config('services.google_maps.browser_key', env('GOOGLE_MAPS_BROWSER_API_KEY', env('GOOGLE_MAPS_API_KEY', ''))),
+                 'mapId' => config('services.google_maps.map_id', env('GOOGLE_MAPS_MAP_ID', '')),
+             ],
+         ]);
+     }
 
-            // Fetch travelled breadcrumbs (last 15 recorded coordinates)
-            $travelledPath = [];
-            if ($hasCoords) {
-                $travelled = TechnicianLocation::where('technician_id', $t->id)
-                    ->where('recorded_at', '>=', now()->subHours(8))
-                    ->orderBy('recorded_at', 'asc')
-                    ->take(30)
-                    ->get(['latitude', 'longitude', 'recorded_at']);
+     /**
+      * POST /maps/admin/recalculate-route
+      */
+     public function recalculateRoute(Request $request, MapsTrackingService $mapsTrackingService)
+     {
+         $techId = $request->input('technicianId') ?? $request->input('technician_id');
+         if (!$techId) {
+             return response()->json(['success' => false, 'message' => 'technicianId is required'], 422);
+         }
 
-                foreach ($travelled as $p) {
-                    $travelledPath[] = [
-                        'latitude' => (float) $p->latitude,
-                        'longitude' => (float) $p->longitude,
-                        'timestamp' => $p->recorded_at ? $p->recorded_at->timestamp * 1000 : null,
-                    ];
-                }
-            }
+         $tech = Technician::findOrFail($techId);
 
-            $service = $t->activeService;
-            $customer = $service ? $service->customer : null;
-            $jobCard = $service ? $service->jobCard : null;
+         if ($tech->current_latitude && $tech->current_longitude && $tech->destination_latitude && $tech->destination_longitude) {
+             $route = $mapsTrackingService->computeRoute(
+                 (float) $tech->current_latitude,
+                 (float) $tech->current_longitude,
+                 (float) $tech->destination_latitude,
+                 (float) $tech->destination_longitude
+             );
 
-            $result[] = [
-                'technicianId' => (string) $t->id,
-                'technicianName' => $t->full_name,
-                'technicianPhone' => $t->phone,
-                'status' => $t->status,
-                'trackingStatus' => $t->tracking_status ?? 'UNTRACKED',
-                'statusFreshness' => $t->statusFreshness,
-                'secondsAgo' => $t->secondsAgo,
-                'latitude' => $hasCoords ? (float) $t->current_latitude : null,
-                'longitude' => $hasCoords ? (float) $t->current_longitude : null,
-                'accuracy' => (float) ($t->current_accuracy ?? 10),
-                'heading' => (float) ($t->current_heading ?? 0),
-                'speed' => (float) ($t->current_speed ?? 0),
-                'serviceId' => $service ? (string) $service->id : null,
-                'serviceNumber' => $service ? $service->service_number : null,
-                'jobCardId' => $jobCard ? (string) $jobCard->id : null,
-                'jobCardNumber' => $jobCard ? $jobCard->job_card_number : null,
-                'customerName' => $customer ? $customer->full_name : ($service->customer_notes ?? 'Client Location'),
-                'customerAddress' => $t->destination_address ?? ($customer && $customer->addresses->first() ? $customer->addresses->first()->full_address : 'Pune, Maharashtra'),
-                'customerLatitude' => $hasDest ? (float) $t->destination_latitude : ($customer && $customer->addresses->first() && $customer->addresses->first()->latitude ? (float) $customer->addresses->first()->latitude : null),
-                'customerLongitude' => $hasDest ? (float) $t->destination_longitude : ($customer && $customer->addresses->first() && $customer->addresses->first()->longitude ? (float) $customer->addresses->first()->longitude : null),
-                'scheduledTime' => $service ? $service->scheduled_time_slot : null,
-                'distanceKm' => $t->distance_km !== null ? (float) $t->distance_km : ($hasCoords && $hasDest ? self::calculateDistanceKm($t->current_latitude, $t->current_longitude, $t->destination_latitude, $t->destination_longitude) : null),
-                'etaMinutes' => $t->eta_minutes !== null ? (int) $t->eta_minutes : ($hasCoords && $hasDest ? self::estimateEtaMinutes(self::calculateDistanceKm($t->current_latitude, $t->current_longitude, $t->destination_latitude, $t->destination_longitude)) : null),
-                'routeStatus' => $hasCoords && $hasDest ? 'SUCCESS' : 'UNAVAILABLE',
-                'travelledPath' => $travelledPath,
-                'lastUpdated' => $t->last_ping_at ? $t->last_ping_at->toIso8601String() : now()->toIso8601String(),
-            ];
-        }
+             $distKm = $route['distanceKm'];
+             $etaMins = $route['etaMinutes'];
 
-        return response()->json([
-            'success' => true,
-            'data' => $result,
-        ]);
-    }
+             $tech->update([
+                 'distance_km' => $distKm,
+                 'eta_minutes' => $etaMins,
+             ]);
 
-    /**
-     * GET /maps/admin/config
-     */
-    public function mapsConfig()
-    {
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'apiKey' => config('services.google_maps.browser_key', env('GOOGLE_MAPS_BROWSER_API_KEY', '')),
-                'mapId' => config('services.google_maps.map_id', env('GOOGLE_MAPS_MAP_ID', '')),
-            ],
-        ]);
-    }
+             return response()->json([
+                 'success' => true,
+                 'data' => [
+                     'technicianId' => $tech->id,
+                     'routeStatus' => 'SUCCESS',
+                     'distanceKm' => $distKm,
+                     'etaMinutes' => $etaMins,
+                     'distanceText' => $route['distanceText'],
+                     'etaText' => $route['durationText'],
+                     'routeCalculatedAt' => (int) (microtime(true) * 1000),
+                 ],
+             ]);
+         }
+
+         return response()->json([
+             'success' => true,
+             'data' => [
+                 'technicianId' => $tech->id,
+                 'routeStatus' => 'UNAVAILABLE',
+                 'distanceKm' => null,
+                 'etaMinutes' => null,
+             ],
+         ]);
+     }
 
     /**
-     * POST /maps/admin/recalculate-route
+     * GET /maps/admin/route-geometry
+     * Guaranteed server-side road route geometry proxy
      */
-    public function recalculateRoute(Request $request)
+    public function routeGeometry(Request $request, MapsTrackingService $mapsTrackingService)
     {
-        $techId = $request->input('technicianId') ?? $request->input('technician_id');
-        if (!$techId) {
-            return response()->json(['success' => false, 'message' => 'technicianId is required'], 422);
+        $originLat = (float) $request->input('originLat');
+        $originLng = (float) $request->input('originLng');
+        $destLat = (float) $request->input('destLat');
+        $destLng = (float) $request->input('destLng');
+
+        if (!$originLat || !$originLng || !$destLat || !$destLng) {
+            return response()->json(['code' => 'Error', 'message' => 'Invalid origin or destination coordinates'], 422);
         }
 
-        $tech = Technician::findOrFail($techId);
+        $res = $mapsTrackingService->fetchRoadGeometry($originLat, $originLng, $destLat, $destLng);
 
-        if ($tech->current_latitude && $tech->current_longitude && $tech->destination_latitude && $tech->destination_longitude) {
-            $distKm = self::calculateDistanceKm($tech->current_latitude, $tech->current_longitude, $tech->destination_latitude, $tech->destination_longitude);
-            $etaMins = self::estimateEtaMinutes($distKm);
-
-            $tech->update([
-                'distance_km' => $distKm,
-                'eta_minutes' => $etaMins,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'technicianId' => $tech->id,
-                    'routeStatus' => 'SUCCESS',
-                    'distanceKm' => $distKm,
-                    'etaMinutes' => $etaMins,
-                    'distanceText' => "{$distKm} km",
-                    'etaText' => "{$etaMins} mins",
-                    'routeCalculatedAt' => now()->timestamp * 1000,
-                ],
-            ]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'technicianId' => $tech->id,
-                'routeStatus' => 'UNAVAILABLE',
-                'distanceKm' => null,
-                'etaMinutes' => null,
-            ],
-        ]);
+        return response()->json($res);
     }
 
     /**
@@ -462,7 +431,7 @@ class TechnicianController extends Controller
             'skills' => 'nullable|array',
             'status' => 'required|in:ACTIVE,ON_LEAVE,INACTIVE',
             'emergency_contact' => 'nullable|string|max:20',
-            'portal_pin' => 'nullable|string|min:4|max:6',
+            'portal_pin' => 'required|string|min:4|max:6',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
@@ -477,11 +446,11 @@ class TechnicianController extends Controller
                 'tracking_status' => 'IDLE',
             ]);
 
-            // Create portal access
+            // Create portal access with admin-assigned PIN
             TechnicianPortalAccess::create([
                 'technician_id' => $tech->id,
                 'portal_enabled' => true,
-                'pin_hash' => !empty($validated['portal_pin']) ? Hash::make($validated['portal_pin']) : Hash::make('1234'),
+                'pin_hash' => Hash::make($validated['portal_pin']),
             ]);
 
             AuditLog::log('CREATE', 'TECHNICIAN', $tech->id, null, ['name' => $tech->full_name]);

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Technician;
 use App\Models\TechnicianPortalAccess;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -13,18 +14,20 @@ class TechnicianPinLoginTest extends TestCase
     use RefreshDatabase;
 
     protected Technician $technician;
+    protected User $adminUser;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(\Database\Seeders\DatabaseSeeder::class);
         $this->technician = Technician::first();
+        $this->adminUser = User::first();
     }
 
     /**
-     * Test technician login page renders with Security PIN components.
+     * Test technician login page renders with Security PIN components without default initial PIN.
      */
-    public function test_login_page_renders_with_pin_components(): void
+    public function test_login_page_renders_with_pin_components_without_default(): void
     {
         $response = $this->get(route('tech_portal.login'));
         $response->assertStatus(200);
@@ -34,6 +37,10 @@ class TechnicianPinLoginTest extends TestCase
         $response->assertSee('Sign In to Technician Portal');
         $response->assertSee($this->technician->full_name);
         $response->assertSee($this->technician->phone);
+
+        // Verify no hardcoded default 1234 in input
+        $response->assertDontSee('value="1234"', false);
+        $response->assertDontSee('Default initial PIN is');
 
         // Confirm OTP elements are removed
         $response->assertDontSee('Get Login OTP');
@@ -48,7 +55,7 @@ class TechnicianPinLoginTest extends TestCase
     {
         $response = $this->postJson(route('tech_portal.authenticate'), [
             'phone' => '0000000000',
-            'pin' => '1234',
+            'pin' => '5821',
         ]);
 
         $response->assertStatus(422);
@@ -60,31 +67,71 @@ class TechnicianPinLoginTest extends TestCase
     }
 
     /**
-     * Test authentication fails with wrong Security PIN.
+     * Test authentication fails when technician has not been assigned a PIN by admin.
      */
-    public function test_authenticate_fails_with_wrong_pin(): void
+    public function test_authenticate_fails_when_no_pin_assigned_by_admin(): void
     {
+        // Remove portal access / pin
+        if ($this->technician->portalAccess) {
+            $this->technician->portalAccess->delete();
+        }
+
         $response = $this->postJson(route('tech_portal.authenticate'), [
             'phone' => $this->technician->phone,
-            'pin' => '9999',
+            'pin' => '1234',
         ]);
 
         $response->assertStatus(422);
         $response->assertJson([
             'success' => false,
-            'message' => 'Invalid Security PIN. Please enter your correct 4-digit PIN.',
+            'message' => 'No Security PIN has been assigned to your account yet. Please contact your administrator to set up your PIN.',
         ]);
         $this->assertNull(session('technician_id'));
     }
 
     /**
-     * Test authentication succeeds with default initial PIN 1234.
+     * Test fallback to 1234 or 0000 is rejected if not assigned.
      */
-    public function test_authenticate_succeeds_with_default_pin_1234(): void
+    public function test_default_pin_1234_is_rejected_when_not_assigned(): void
     {
+        TechnicianPortalAccess::updateOrCreate(
+            ['technician_id' => $this->technician->id],
+            [
+                'portal_enabled' => true,
+                'pin_hash' => Hash::make('9482'),
+            ]
+        );
+
         $response = $this->postJson(route('tech_portal.authenticate'), [
             'phone' => $this->technician->phone,
             'pin' => '1234',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => 'Invalid Security PIN. Please enter your correct PIN or contact your administrator.',
+        ]);
+        $this->assertNull(session('technician_id'));
+    }
+
+    /**
+     * Test authentication succeeds only with the admin-assigned separate PIN.
+     */
+    public function test_authenticate_succeeds_with_admin_assigned_pin(): void
+    {
+        TechnicianPortalAccess::updateOrCreate(
+            ['technician_id' => $this->technician->id],
+            [
+                'portal_enabled' => true,
+                'pin_hash' => Hash::make('6291'),
+            ]
+        );
+
+        // Correct PIN
+        $response = $this->postJson(route('tech_portal.authenticate'), [
+            'phone' => $this->technician->phone,
+            'pin' => '6291',
         ]);
 
         $response->assertStatus(200);
@@ -101,32 +148,32 @@ class TechnicianPinLoginTest extends TestCase
     }
 
     /**
-     * Test authentication succeeds with custom configured PIN hash.
+     * Test admin can assign a separate PIN for a technician via admin panel.
      */
-    public function test_authenticate_succeeds_with_custom_hashed_pin(): void
+    public function test_admin_can_assign_separate_pin_for_technician(): void
     {
-        TechnicianPortalAccess::updateOrCreate(
-            ['technician_id' => $this->technician->id],
-            [
-                'portal_enabled' => true,
-                'pin_hash' => Hash::make('7890'),
-            ]
-        );
+        $response = $this->actingAs($this->adminUser)
+            ->postJson(route('technicians.reset_pin', $this->technician->id), [
+                'pin' => '7143',
+            ]);
 
-        // Wrong PIN fails
-        $wrongResponse = $this->postJson(route('tech_portal.authenticate'), [
-            'phone' => $this->technician->phone,
-            'pin' => '1111',
-        ]);
-        $wrongResponse->assertStatus(422);
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Technician Portal PIN updated successfully.',
+            ]);
 
-        // Correct custom PIN succeeds
-        $correctResponse = $this->postJson(route('tech_portal.authenticate'), [
+        $this->technician->refresh();
+        $this->assertTrue(Hash::check('7143', $this->technician->portalAccess->pin_hash));
+
+        // Now technician logs in with new admin-assigned PIN
+        $loginResponse = $this->postJson(route('tech_portal.authenticate'), [
             'phone' => $this->technician->phone,
-            'pin' => '7890',
+            'pin' => '7143',
         ]);
-        $correctResponse->assertStatus(200);
-        $correctResponse->assertSessionHas('technician_id', $this->technician->id);
+
+        $loginResponse->assertStatus(200);
+        $loginResponse->assertSessionHas('technician_id', $this->technician->id);
     }
 
     /**
@@ -138,13 +185,13 @@ class TechnicianPinLoginTest extends TestCase
             ['technician_id' => $this->technician->id],
             [
                 'portal_enabled' => false,
-                'pin_hash' => Hash::make('1234'),
+                'pin_hash' => Hash::make('7143'),
             ]
         );
 
         $response = $this->postJson(route('tech_portal.authenticate'), [
             'phone' => $this->technician->phone,
-            'pin' => '1234',
+            'pin' => '7143',
         ]);
 
         $response->assertStatus(403);

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'google_maps' => [
+        'browser_key' => env('GOOGLE_MAPS_BROWSER_API_KEY', env('GOOGLE_MAPS_API_KEY', 'AIzaSyCwOZfzJtiXB6-YezhDbrRX8NFN9Ftvuho')),
+        'routes_key' => env('GOOGLE_MAPS_SERVER_API_KEY', env('ROUTES_API_KEY', 'AIzaSyDdTekgLDrfEgoE2Dnzc48A_Ew0gvn_7yc')),
+        'map_id' => env('GOOGLE_MAPS_MAP_ID', 'ce26a3716462fb83393ece93'),
+    ],
+
 ];

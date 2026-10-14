@@ -62,28 +62,28 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Company Trade Name</label>
-                        <input type="text" name="company_name" value="{{ $settings['company_name'] ?? 'Enterprises CRM' }}" class="form-input text-sm font-semibold">
+                        <input type="text" name="company_name" value="{{ $settings['company_name'] ?? '' }}" placeholder="Enterprises CRM" class="form-input text-sm font-semibold">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">GSTIN (GST Identification Number)</label>
-                        <input type="text" name="company_gstin" value="{{ $settings['company_gstin'] ?? ($settings['gst_number'] ?? '27AABCS1429B1Z') }}" class="form-input text-sm font-mono uppercase">
+                        <input type="text" name="company_gstin" value="{{ $settings['company_gstin'] ?? ($settings['gst_number'] ?? '') }}" placeholder="27AABCS1429B1Z" class="form-input text-sm font-mono uppercase">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Official Phone / Helpline</label>
-                        <input type="text" name="company_phone" value="{{ $settings['company_phone'] ?? ($settings['support_phone'] ?? '+91 98765 43210') }}" class="form-input text-sm font-mono">
+                        <input type="text" name="company_phone" value="{{ $settings['company_phone'] ?? ($settings['support_phone'] ?? '') }}" placeholder="+91 98765 43210" class="form-input text-sm font-mono">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Official Email Address</label>
-                        <input type="email" name="company_email" value="{{ $settings['company_email'] ?? ($settings['support_email'] ?? 'billing@enterprisescrm.com') }}" class="form-input text-sm">
+                        <input type="email" name="company_email" value="{{ $settings['company_email'] ?? ($settings['support_email'] ?? '') }}" placeholder="billing@enterprisescrm.com" class="form-input text-sm">
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Registered Workshop / Office Address</label>
-                    <textarea name="company_address" rows="2" class="form-input text-xs">{{ $settings['company_address'] ?? 'Plot No. 42, Industrial Area, Phase II, Pune - 411019, MH, India' }}</textarea>
+                    <textarea name="company_address" rows="2" placeholder="Plot No. 42, Industrial Area, Phase II, Pune - 411019, MH, India" class="form-input text-xs">{{ $settings['company_address'] ?? '' }}</textarea>
                 </div>
 
                 <div class="pt-4 border-t border-slate-200">
@@ -91,26 +91,26 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Bank Name</label>
-                            <input type="text" name="bank_name" value="{{ $settings['bank_name'] ?? 'State Bank of India' }}" class="form-input text-xs">
+                            <input type="text" name="bank_name" value="{{ $settings['bank_name'] ?? '' }}" placeholder="State Bank of India" class="form-input text-xs">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Account Number</label>
-                            <input type="text" name="bank_account_number" value="{{ $settings['bank_account_number'] ?? '30998877665' }}" class="form-input text-xs font-mono">
+                            <input type="text" name="bank_account_number" value="{{ $settings['bank_account_number'] ?? '' }}" placeholder="30998877665" class="form-input text-xs font-mono">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">IFSC Code</label>
-                            <input type="text" name="bank_ifsc" value="{{ $settings['bank_ifsc'] ?? 'SBIN0001234' }}" class="form-input text-xs font-mono uppercase">
+                            <input type="text" name="bank_ifsc" value="{{ $settings['bank_ifsc'] ?? '' }}" placeholder="SBIN0001234" class="form-input text-xs font-mono uppercase">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Branch Name</label>
-                            <input type="text" name="bank_branch" value="{{ $settings['bank_branch'] ?? 'Main Branch, Pune' }}" class="form-input text-xs">
+                            <input type="text" name="bank_branch" value="{{ $settings['bank_branch'] ?? '' }}" placeholder="Main Branch, Pune" class="form-input text-xs">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">UPI VPA Handle</label>
-                            <input type="text" name="upi_id" value="{{ $settings['upi_id'] ?? 'enterprises.crm@upi' }}" class="form-input text-xs font-mono">
+                            <input type="text" name="upi_id" value="{{ $settings['upi_id'] ?? '' }}" placeholder="enterprises.crm@upi" class="form-input text-xs font-mono">
                         </div>
                     </div>
                 </div>

@@ -53,6 +53,7 @@ class ServiceController extends Controller
         $allServices = Service::all();
         $totalScheduled = $allServices->whereIn('status', ['SCHEDULED', 'ASSIGNED'])->count();
         $totalInProgress = $allServices->where('status', 'IN_PROGRESS')->count();
+        $totalOnHold = $allServices->where('status', 'ON_HOLD')->count();
         $totalCompleted = $allServices->where('status', 'COMPLETED')->count();
         $totalOverdue = $allServices->filter(function ($s) {
             return $s->scheduled_date < now() && !in_array($s->status, ['COMPLETED', 'CANCELLED']);
@@ -73,6 +74,7 @@ class ServiceController extends Controller
                 'stats' => [
                     'scheduled' => $totalScheduled,
                     'in_progress' => $totalInProgress,
+                    'on_hold' => $totalOnHold,
                     'completed' => $totalCompleted,
                     'overdue' => $totalOverdue,
                 ],
@@ -88,6 +90,7 @@ class ServiceController extends Controller
             'assets',
             'totalScheduled',
             'totalInProgress',
+            'totalOnHold',
             'totalCompleted',
             'totalOverdue',
             'heatmapData'
@@ -450,5 +453,49 @@ class ServiceController extends Controller
                 'message' => "Service {$service->service_number} marked as completed.",
             ]);
         });
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:SCHEDULED,ASSIGNED,IN_PROGRESS,ON_HOLD,COMPLETED,CANCELLED',
+            'notes' => 'nullable|string',
+            'reason' => 'nullable|string',
+        ]);
+
+        $service = Service::findOrFail($id);
+        $note = $validated['reason'] ?? $validated['notes'] ?? null;
+
+        $serviceData = ['status' => $validated['status']];
+        if ($note) {
+            $timestamp = now()->format('d M Y, h:i A');
+            $serviceData['internal_notes'] = trim(($service->internal_notes ? $service->internal_notes . "\n" : '') . "[{$timestamp} - {$validated['status']}]: " . $note);
+        }
+        $service->update($serviceData);
+
+        if ($service->jobCard) {
+            $cardData = ['status' => $validated['status']];
+            if ($note) {
+                $timestamp = now()->format('d M Y, h:i A');
+                $cardData['technician_notes'] = trim(($service->jobCard->technician_notes ? $service->jobCard->technician_notes . "\n" : '') . "[{$timestamp} - {$validated['status']}]: " . $note);
+            }
+            $service->jobCard->update($cardData);
+        }
+
+        AuditLog::create([
+            'id' => (string) Str::uuid(),
+            'entity_type' => 'SERVICE',
+            'entity_id' => $service->id,
+            'action' => 'STATUS_CHANGE',
+            'user_id' => auth()->id() ?? 'system',
+            'performed_by' => auth()->user()->name ?? 'Admin Staff',
+            'changes' => json_encode(['status' => $validated['status'], 'note' => $note]),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Service status updated to {$validated['status']}.",
+            'status' => $validated['status'],
+        ]);
     }
 }

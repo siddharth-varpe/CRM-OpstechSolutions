@@ -169,12 +169,6 @@
 
             <!-- Top Header Right Elements -->
             <div class="flex items-center gap-3">
-                <!-- Live GPS Tracking Map Shortcut -->
-                <a href="{{ route('technicians.map') }}" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200/80 transition-all shadow-2xs" title="View Real-Time Field Technician GPS Tracking">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <i data-lucide="navigation" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>Live GPS Map</span>
-                </a>
 
                 <!-- Search Button (Command Palette Ctrl+K) -->
                 <button type="button" id="search-trigger-btn" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200/80 transition-colors">

@@ -123,7 +123,7 @@
                     <input type="password" 
                            name="pin" 
                            id="inputPin" 
-                           value="1234" 
+                           value="" 
                            maxlength="6" 
                            required 
                            placeholder="••••" 
@@ -131,8 +131,8 @@
                 </div>
 
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-500 flex items-start gap-2">
-                    <i data-lucide="info" class="w-4 h-4 text-sky-600 shrink-0 mt-0.5"></i>
-                    <span>Default initial PIN is <strong>1234</strong>. Contact administrator if you need a PIN reset.</span>
+                    <i data-lucide="shield-check" class="w-4 h-4 text-sky-600 shrink-0 mt-0.5"></i>
+                    <span>Enter your unique Security PIN assigned by your administrator. Contact administrator if you need your PIN assigned or reset.</span>
                 </div>
 
                 <button type="submit" id="btnSubmitPin" class="w-full bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm cursor-pointer">

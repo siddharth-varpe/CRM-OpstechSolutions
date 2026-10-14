@@ -191,6 +191,7 @@
                     <option value="SCHEDULED" {{ request('status') === 'SCHEDULED' ? 'selected' : '' }}>Scheduled</option>
                     <option value="ASSIGNED" {{ request('status') === 'ASSIGNED' ? 'selected' : '' }}>Assigned</option>
                     <option value="IN_PROGRESS" {{ request('status') === 'IN_PROGRESS' ? 'selected' : '' }}>In Progress</option>
+                    <option value="ON_HOLD" {{ request('status') === 'ON_HOLD' ? 'selected' : '' }}>On Hold</option>
                     <option value="COMPLETED" {{ request('status') === 'COMPLETED' ? 'selected' : '' }}>Completed</option>
                     <option value="CANCELLED" {{ request('status') === 'CANCELLED' ? 'selected' : '' }}>Cancelled</option>
                 </select>
@@ -311,14 +312,18 @@
                                     $statusColors = [
                                         'COMPLETED' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                                         'IN_PROGRESS' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                        'ON_HOLD' => 'bg-amber-100 text-amber-800 border-amber-300',
                                         'ASSIGNED' => 'bg-sky-50 text-sky-700 border-sky-200',
                                         'SCHEDULED' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
                                         'CANCELLED' => 'bg-slate-100 text-slate-600 border-slate-200',
                                     ];
                                     $st = $statusColors[$s->status] ?? 'bg-slate-50 text-slate-700 border-slate-200';
                                 @endphp
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border {{ $st }}">
-                                    {{ $s->status }}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border {{ $st }}">
+                                    @if($s->status === 'ON_HOLD')
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                    @endif
+                                    {{ $s->status === 'ON_HOLD' ? 'ON HOLD' : $s->status }}
                                 </span>
                             </td>
 

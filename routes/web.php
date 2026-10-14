@@ -50,12 +50,15 @@ Route::middleware('auth')->group(function () {
     // Customers
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('/customers/geocode', [CustomerController::class, 'geocodeAddress'])->name('customers.geocode');
     Route::get('/customers/export/csv', [CustomerController::class, 'exportCsv'])->name('customers.export');
     Route::post('/customers/import/analyze', [CustomerController::class, 'analyzeImport'])->name('customers.import.analyze');
     Route::post('/customers/import/commit', [CustomerController::class, 'commitImport'])->name('customers.import.commit');
     Route::get('/customers/import/sample', [CustomerController::class, 'downloadSampleImport'])->name('customers.import.sample');
     Route::get('/customers/{id}', [CustomerController::class, 'show'])->name('customers.show');
     Route::put('/customers/{id}', [CustomerController::class, 'update'])->name('customers.update');
+    Route::post('/customers/{id}/addresses', [CustomerController::class, 'storeAddress'])->name('customers.addresses.store');
+    Route::put('/customers/{id}/addresses/{addressId}', [CustomerController::class, 'updateAddress'])->name('customers.addresses.update');
 
     // Customer Assets
     Route::get('/customers/{customerId}/assets', [ServiceController::class, 'customerAssets'])->name('customers.assets.list');
@@ -95,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/services/{id}', [ServiceController::class, 'show'])->name('services.show');
     Route::post('/services/{id}/assign', [ServiceController::class, 'assignTechnician'])->name('services.assign');
     Route::post('/services/{id}/complete', [ServiceController::class, 'complete'])->name('services.complete');
+    Route::post('/services/{id}/status', [ServiceController::class, 'updateStatus'])->name('services.status');
 
     // Technicians & Field Workforce Directory
     Route::get('/technicians', [TechnicianController::class, 'index'])->name('technicians.index');
@@ -112,6 +116,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/maps/admin/config', [TechnicianController::class, 'mapsConfig'])->name('maps.admin.config');
     Route::get('/maps/admin/live-technicians', [TechnicianController::class, 'liveTechnicians'])->name('maps.admin.live');
     Route::post('/maps/admin/recalculate-route', [TechnicianController::class, 'recalculateRoute'])->name('maps.admin.recalculate');
+    Route::get('/maps/admin/route-geometry', [TechnicianController::class, 'routeGeometry'])->name('maps.admin.route_geometry');
+    Route::get('/api/v1/maps/admin/config', [TechnicianController::class, 'mapsConfig'])->name('api.maps.admin.config');
+    Route::get('/api/v1/maps/admin/live-technicians', [TechnicianController::class, 'liveTechnicians'])->name('api.maps.admin.live');
+    Route::post('/api/v1/maps/admin/recalculate-route', [TechnicianController::class, 'recalculateRoute'])->name('api.maps.admin.recalculate');
+    Route::get('/api/v1/maps/admin/route-geometry', [TechnicianController::class, 'routeGeometry'])->name('api.maps.admin.route_geometry');
 
     // Job Cards
     Route::get('/job-cards', [JobCardController::class, 'index'])->name('job_cards.index');
@@ -155,8 +164,20 @@ Route::prefix('tech-portal')->group(function () {
     Route::post('/services/{id}/complete', [TechnicianPortalController::class, 'completeService'])->name('tech_portal.complete');
     Route::post('/stop-navigation', [TechnicianPortalController::class, 'stopNavigation'])->name('tech_portal.navigate.stop');
     Route::post('/gps', [TechnicianPortalController::class, 'updateGps'])->name('tech_portal.gps');
+    Route::post('/services/{id}/destination-coordinates', [TechnicianPortalController::class, 'saveDestinationCoordinates'])->name('tech_portal.destination_coordinates');
 
     // Legacy API aliases for mobile client compatibility
     Route::post('/maps/technician/navigate', [TechnicianPortalController::class, 'apiStartNavigate']);
     Route::post('/maps/technician/location', [TechnicianPortalController::class, 'apiLocationPing']);
+    Route::post('/maps/technician/stop', [TechnicianPortalController::class, 'stopNavigation']);
+    Route::get('/maps/technician/active', [TechnicianPortalController::class, 'activeTracking']);
+});
+
+// Direct API v1 Routes for Technician Tracking
+Route::prefix('api/v1/maps/technician')->group(function () {
+    Route::post('/navigate', [TechnicianPortalController::class, 'startNavigationViaPost'])->name('api.maps.technician.navigate');
+    Route::post('/location', [TechnicianPortalController::class, 'updateGps'])->name('api.maps.technician.location');
+    Route::post('/stop', [TechnicianPortalController::class, 'stopNavigation'])->name('api.maps.technician.stop');
+    Route::get('/active', [TechnicianPortalController::class, 'activeTracking'])->name('api.maps.technician.active');
+    Route::post('/destination-coordinates/{serviceId}', [TechnicianPortalController::class, 'saveDestinationCoordinates'])->name('api.maps.technician.save_coordinates');
 });

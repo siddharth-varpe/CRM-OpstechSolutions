@@ -58,51 +58,53 @@ class TechnicianPortalThemingAndTabsTest extends TestCase
         $response->assertSee('ENTERPRISES');
         $response->assertSee($this->technician->full_name);
 
-        // 2. Tab Panes (All 5 pages in tab form)
-        $response->assertSee('id="tabPane-tasks"', false);
-        $response->assertSee('id="tabPane-navigation"', false);
-        $response->assertSee('id="tabPane-execute"', false);
+        // 2. Tab Panes (Assigned tab, history, profile — without inline execution tab or in-app map)
+        $response->assertSee('id="tabPane-assigned"', false);
+        $response->assertDontSee('id="tabPane-navigation"', false);
+        $response->assertDontSee('id="tabPane-execute"', false);
         $response->assertSee('id="tabPane-history"', false);
         $response->assertSee('id="tabPane-profile"', false);
 
-        // 3. Top Tab triggers
-        $response->assertSee('id="tabBtn-tasks"', false);
-        $response->assertSee('id="tabBtn-navigation"', false);
-        $response->assertSee('id="tabBtn-execute"', false);
-        $response->assertSee('id="tabBtn-history"', false);
-        $response->assertSee('id="tabBtn-profile"', false);
+        // 3. Top Tab triggers removed (tabs kept only at bottom)
+        $response->assertDontSee('id="tabBtn-assigned"', false);
+        $response->assertDontSee('id="tabBtn-history"', false);
+        $response->assertDontSee('id="tabBtn-profile"', false);
 
         // 4. Mobile Bottom App Navigation Bar
-        $response->assertSee('id="botNav-tasks"', false);
-        $response->assertSee('id="botNav-navigation"', false);
-        $response->assertSee('id="botNav-execute"', false);
+        $response->assertSee('id="botNav-assigned"', false);
+        $response->assertDontSee('id="botNav-navigation"', false);
+        $response->assertDontSee('id="botNav-execute"', false);
         $response->assertSee('id="botNav-history"', false);
         $response->assertSee('id="botNav-profile"', false);
 
-        // 5. Interactive Components
-        $response->assertSee('id="mapPortalNav"', false); // Leaflet map container
-        $response->assertSee('id="canvasSignature"', false); // Touch signature pad
-        $response->assertSee('id="formCompleteJobCard"', false); // Job card form
+        // 5. Interactive Components (no in-app map or inline execution form)
+        $response->assertDontSee('id="mapPortalNav"', false);
+        $response->assertDontSee('id="formCompleteJobCard"', false);
     }
 
     /**
-     * Test navigation and execute tabs with query parameters.
+     * Test assigned tab with query parameters, job card execution link, and Google Maps navigation.
      */
-    public function test_dashboard_supports_tab_query_parameters(): void
+    public function test_dashboard_supports_tab_query_parameters_and_job_card_navigation(): void
     {
         $service = Service::where('technician_id', $this->technician->id)->first();
-        $serviceId = $service ? $service->id : '';
+        $this->assertNotNull($service);
+        $serviceId = $service->id;
 
-        // Open navigation tab directly
-        $navResponse = $this->withSession(['technician_id' => $this->technician->id])
-            ->get(route('tech_portal.dashboard', ['tab' => 'navigation', 'service_id' => $serviceId]));
-        $navResponse->assertStatus(200);
-        $navResponse->assertSee('Live Field Navigation');
+        // Open assigned tab directly
+        $assignedResponse = $this->withSession(['technician_id' => $this->technician->id])
+            ->get(route('tech_portal.dashboard', ['tab' => 'assigned']));
+        $assignedResponse->assertStatus(200);
+        $assignedResponse->assertSee('Assigned Services');
+        $assignedResponse->assertSee(route('tech_portal.navigation', $serviceId));
+        $assignedResponse->assertSee(route('tech_portal.service', $serviceId));
 
-        // Open execution tab directly
+        // Visit dedicated service execution page
         $execResponse = $this->withSession(['technician_id' => $this->technician->id])
-            ->get(route('tech_portal.dashboard', ['tab' => 'execute', 'service_id' => $serviceId]));
+            ->get(route('tech_portal.service', $serviceId));
         $execResponse->assertStatus(200);
-        $execResponse->assertSee('Execute Job Card');
+        $execResponse->assertSee('Job Execution');
+        $execResponse->assertSee('Back to Assigned');
+        $execResponse->assertSee('sigCanvas');
     }
 }

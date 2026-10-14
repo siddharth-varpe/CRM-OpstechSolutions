@@ -22,6 +22,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Payment;
 use App\Models\Technician;
+use App\Models\TechnicianPortalAccess;
 use App\Models\Service;
 use App\Models\JobCard;
 use App\Models\Rental;
@@ -162,6 +163,15 @@ class DatabaseSeeder extends Seeder
                 'skills' => ['Equipment Installation', 'Component Replacement', 'Preventive Maintenance', 'Commercial Diagnostics'],
                 'address' => 'Plot 45, MIDC Industrial Area, Pune',
                 'emergency_contact' => '9822099999',
+            ]
+        );
+
+        // Assign unique portal PIN for technician
+        TechnicianPortalAccess::firstOrCreate(
+            ['technician_id' => $technician->id],
+            [
+                'portal_enabled' => true,
+                'pin_hash' => Hash::make('5821'),
             ]
         );
 
@@ -415,8 +425,6 @@ class DatabaseSeeder extends Seeder
 
         // 11. System Settings
         SystemSetting::set('company_name', 'Enterprises CRM', 'Official registered company name');
-        SystemSetting::set('support_phone', '+91 9021653893', 'Customer care support phone');
-        SystemSetting::set('support_email', 'varpes380@gmail.com', 'Customer care email');
         SystemSetting::set('gst_number', '27AAACS1234F1Z8', 'Default company GSTIN');
         SystemSetting::set('default_gst_rate', '0', 'Default GST rate percentage for all invoices and sales');
     }

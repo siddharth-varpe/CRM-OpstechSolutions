@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\JobCard;
 use App\Models\InventoryItem;
 use App\Models\AuditLog;
+use App\Services\MapsTrackingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
@@ -24,11 +25,13 @@ class TechnicianPortalController extends Controller
         if ($techId) {
             return Technician::find($techId);
         }
-        // Fallback: if logged in as user with technician role or default first technician
-        if (auth()->check() && auth()->user()->hasRole('TECHNICIAN')) {
-            return Technician::where('user_id', auth()->id())->first() ?? Technician::first();
+        if (auth()->check()) {
+            if (auth()->user()->hasRole('TECHNICIAN')) {
+                return Technician::where('user_id', auth()->id())->first() ?? Technician::first();
+            }
+            return Technician::first();
         }
-        return Technician::first();
+        return null;
     }
 
     public function login()
@@ -65,39 +68,26 @@ class TechnicianPortalController extends Controller
             ], 403);
         }
 
-        $pin = trim($validated['pin']);
-        $pinValid = false;
-
-        // Verify against technician portal access pin_hash if configured
-        if ($technician->portalAccess && !empty($technician->portalAccess->pin_hash)) {
-            if (Hash::check($pin, $technician->portalAccess->pin_hash)) {
-                $pinValid = true;
-            }
-        }
-
-        // Standard default initial technician PIN '1234'
-        if (!$pinValid && in_array($pin, ['1234', '0000'])) {
-            $pinValid = true;
-        }
-
-        if (!$pinValid) {
+        // Verify that the technician has an admin-assigned PIN configured
+        if (!$technician->portalAccess || empty($technician->portalAccess->pin_hash)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid Security PIN. Please enter your correct 4-digit PIN.',
+                'message' => 'No Security PIN has been assigned to your account yet. Please contact your administrator to set up your PIN.',
+            ], 422);
+        }
+
+        $pin = trim($validated['pin']);
+
+        // Check PIN strictly against the admin-assigned hash for this technician
+        if (!Hash::check($pin, $technician->portalAccess->pin_hash)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Security PIN. Please enter your correct PIN or contact your administrator.',
             ], 422);
         }
 
         // Update last login timestamp
-        if ($technician->portalAccess) {
-            $technician->portalAccess->update(['last_login_at' => now()]);
-        } else {
-            TechnicianPortalAccess::create([
-                'technician_id' => $technician->id,
-                'portal_enabled' => true,
-                'pin_hash' => Hash::make($pin),
-                'last_login_at' => now(),
-            ]);
-        }
+        $technician->portalAccess->update(['last_login_at' => now()]);
 
         // Establish session
         session(['technician_id' => $technician->id]);
@@ -124,7 +114,7 @@ class TechnicianPortalController extends Controller
 
         $assignedServices = Service::where('technician_id', $technician->id)
             ->with(['customer.addresses', 'asset.product', 'jobCard', 'warranty'])
-            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS', 'SCHEDULED'])
+            ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS', 'SCHEDULED', 'ON_HOLD'])
             ->orderBy('scheduled_date', 'asc')
             ->get();
 
@@ -153,7 +143,10 @@ class TechnicianPortalController extends Controller
             $activeService = $assignedServices->where('status', 'IN_PROGRESS')->first() ?? $assignedServices->first();
         }
 
-        $activeTab = $request->query('tab', 'tasks');
+        $activeTab = $request->query('tab', 'assigned');
+        if (in_array($activeTab, ['tasks', 'execute'])) {
+            $activeTab = 'assigned';
+        }
 
         return view('technician_portal.dashboard', compact(
             'technician',
@@ -181,19 +174,38 @@ class TechnicianPortalController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
-            'status' => 'required|in:IN_PROGRESS,ON_HOLD,COMPLETED',
+            'status' => 'required|in:IN_PROGRESS,ON_HOLD,COMPLETED,SCHEDULED',
+            'notes' => 'nullable|string',
+            'reason' => 'nullable|string',
         ]);
 
         $service = Service::findOrFail($id);
-        $service->update(['status' => $validated['status']]);
+        $note = $validated['reason'] ?? $validated['notes'] ?? null;
+
+        $serviceData = ['status' => $validated['status']];
+        if ($note) {
+            $timestamp = now()->format('d M Y, h:i A');
+            $statusLabel = $validated['status'] === 'ON_HOLD' ? 'ON HOLD' : $validated['status'];
+            $serviceData['internal_notes'] = trim(($service->internal_notes ? $service->internal_notes . "\n" : '') . "[{$timestamp} - {$statusLabel}]: " . $note);
+        }
+        $service->update($serviceData);
 
         if ($service->jobCard) {
-            $service->jobCard->update(['status' => $validated['status']]);
+            $cardData = ['status' => $validated['status']];
+            if ($note) {
+                $timestamp = now()->format('d M Y, h:i A');
+                $statusLabel = $validated['status'] === 'ON_HOLD' ? 'ON HOLD' : $validated['status'];
+                $cardData['technician_notes'] = trim(($service->jobCard->technician_notes ? $service->jobCard->technician_notes . "\n" : '') . "[{$timestamp} - {$statusLabel}]: " . $note);
+            }
+            $service->jobCard->update($cardData);
         }
+
+        $displayStatus = $validated['status'] === 'ON_HOLD' ? 'On Hold' : ($validated['status'] === 'IN_PROGRESS' ? 'In Progress' : $validated['status']);
 
         return response()->json([
             'success' => true,
-            'message' => "Status updated to {$validated['status']}.",
+            'message' => "Job status updated to {$displayStatus}.",
+            'status' => $validated['status'],
         ]);
     }
 
@@ -264,7 +276,7 @@ class TechnicianPortalController extends Controller
     /**
      * Mobile Turn-by-Turn GPS Navigation Screen for Field Technician
      */
-    public function navigationScreen($id)
+    public function navigationScreen($id, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
         if (!$tech) {
@@ -273,178 +285,367 @@ class TechnicianPortalController extends Controller
 
         $service = Service::with(['customer.addresses', 'asset.product', 'jobCard'])->findOrFail($id);
 
-        // Fetch customer coordinates
-        $address = $service->customer->addresses->first();
-        $destLat = $address ? (float) ($address->latitude ?? 18.5167) : 18.5167;
-        $destLng = $address ? (float) ($address->longitude ?? 73.8415) : 73.8415;
-        $destAddress = $address ? $address->full_address : ($service->customer_notes ?? 'Customer Premise, Pune');
+        // If live coordinates provided in request, update technician's current position immediately
+        if (request()->filled('lat') && request()->filled('lng')) {
+            $currentLat = (float) request()->input('lat');
+            $currentLng = (float) request()->input('lng');
+            $accuracy = (float) request()->input('accuracy', 10);
+            $speed = (float) request()->input('speed', 0);
+            $heading = (float) request()->input('heading', 0);
 
-        // Automatically set as active destination
-        $tech->update([
-            'active_service_id' => $service->id,
-            'tracking_status' => 'ON_THE_WAY',
-            'destination_latitude' => $destLat,
-            'destination_longitude' => $destLng,
-            'destination_address' => $destAddress,
-        ]);
-
-        $googleMapsUrl = "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}";
-
-        return view('technician_portal.navigation', compact('service', 'tech', 'destLat', 'destLng', 'destAddress', 'googleMapsUrl'));
-    }
-
-    /**
-     * Start active navigation for a service
-     */
-    public function startNavigation(Request $request, $serviceId)
-    {
-        $tech = $this->getCurrentTechnician();
-        if (!$tech) {
-            return response()->json(['success' => false, 'message' => 'Technician session expired'], 401);
+            if ($currentLat >= -90 && $currentLat <= 90 && $currentLng >= -180 && $currentLng <= 180) {
+                $mapsTrackingService->updateLocation((string) $tech->id, $tech->full_name, $tech->phone, [
+                    'latitude' => $currentLat,
+                    'longitude' => $currentLng,
+                    'accuracy' => $accuracy,
+                    'speed' => $speed,
+                    'heading' => $heading,
+                ]);
+            }
+        } elseif ($tech->current_latitude === null || $tech->current_longitude === null) {
+            // Initialize with default base coordinates if technician has never pinged GPS yet
+            $mapsTrackingService->updateLocation((string) $tech->id, $tech->full_name, $tech->phone, [
+                'latitude' => 18.5204,
+                'longitude' => 73.8567,
+                'accuracy' => 10,
+                'speed' => 0,
+                'heading' => 0,
+            ]);
         }
 
-        $service = Service::with(['customer.addresses', 'jobCard'])->findOrFail($serviceId);
-        $address = $service->customer->addresses->first();
+        // Fetch customer coordinates and address
+        $address = $service->customer ? ($service->customer->primaryAddress ?? $service->customer->addresses->first()) : null;
+        $destLat = ($address && $address->latitude !== null && (float) $address->latitude != 0.0 && (float) $address->latitude >= -90 && (float) $address->latitude <= 90) ? (float) $address->latitude : null;
+        $destLng = ($address && $address->longitude !== null && (float) $address->longitude != 0.0 && (float) $address->longitude >= -180 && (float) $address->longitude <= 180) ? (float) $address->longitude : null;
+        $destAddress = ($address && !empty(trim($address->full_address)))
+            ? trim($address->full_address)
+            : null;
 
-        $destLat = $address && $address->latitude ? (float) $address->latitude : 18.5167;
-        $destLng = $address && $address->longitude ? (float) $address->longitude : 73.8415;
-        $destAddress = $address ? $address->full_address : 'Pune, Maharashtra';
+        $hasCoords = ($destLat !== null && $destLng !== null);
+        $hasAddress = !empty($destAddress);
 
-        $tech->update([
-            'active_service_id' => $service->id,
-            'tracking_status' => 'ON_THE_WAY',
-            'destination_latitude' => $destLat,
-            'destination_longitude' => $destLng,
-            'destination_address' => $destAddress,
-            'last_ping_at' => now(),
-        ]);
+        if (!$hasCoords && !$hasAddress) {
+            if (request()->ajax() || request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'CUSTOMER_COORDINATES_MISSING',
+                        'message' => 'Customer premise destination coordinates and address are not configured. Please set the customer location pin in Customer Details.',
+                    ],
+                ], 400);
+            }
+            return redirect()->back()->with('error', 'Customer premise destination coordinates and address are not configured.');
+        }
 
-        $service->update(['status' => 'IN_PROGRESS']);
+        $googleMapsUrl = $hasCoords
+            ? "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}&travelmode=driving"
+            : "https://www.google.com/maps/dir/?api=1&destination=" . urlencode($destAddress) . "&travelmode=driving";
 
-        $googleMapsUrl = "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}";
-
-        return response()->json([
-            'success' => true,
-            'trackingStatus' => 'ON_THE_WAY',
-            'googleMapsUrl' => $googleMapsUrl,
-            'destination' => [
-                'serviceId' => $service->id,
+        if ($hasCoords || $hasAddress) {
+            $mapsTrackingService->setActiveDestination((string) $tech->id, [
+                'serviceId' => (string) $service->id,
                 'serviceNumber' => $service->service_number,
+                'jobCardId' => $service->jobCard ? (string) $service->jobCard->id : null,
+                'jobCardNumber' => $service->jobCard ? $service->jobCard->job_card_number : null,
+                'customerId' => (string) $service->customer->id,
                 'customerName' => $service->customer->full_name,
                 'customerPhone' => $service->customer->phone,
                 'address' => $destAddress,
                 'latitude' => $destLat,
                 'longitude' => $destLng,
-            ],
-            'navigationUrl' => route('tech_portal.navigation', $service->id),
+                'scheduledDate' => $service->scheduled_date,
+                'scheduledTimeSlot' => $service->scheduled_time_slot,
+            ]);
+        }
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'redirect' => $googleMapsUrl,
+                'googleMapsUrl' => $googleMapsUrl,
+            ]);
+        }
+
+        return redirect()->away($googleMapsUrl);
+    }
+
+    /**
+     * Start active navigation for a service
+     */
+    public function startNavigation(Request $request, $serviceId, MapsTrackingService $mapsTrackingService)
+    {
+        $tech = $this->getCurrentTechnician();
+        if (!$tech) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'UNAUTHORIZED',
+                    'message' => 'Technician session expired or unauthorized',
+                ],
+            ], 401);
+        }
+
+        $service = Service::with(['customer.addresses', 'jobCard'])->findOrFail($serviceId);
+
+        // Authorization check: service must be assigned to this technician
+        if ($service->technician_id !== $tech->id && (!auth()->check() || !auth()->user()->hasRole('ADMIN'))) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'FORBIDDEN',
+                    'message' => 'Service is not assigned to the authenticated technician',
+                ],
+            ], 403);
+        }
+
+        $address = $service->customer ? ($service->customer->primaryAddress ?? $service->customer->addresses->first()) : null;
+        $destLat = ($address && $address->latitude !== null && (float) $address->latitude != 0.0 && (float) $address->latitude >= -90 && (float) $address->latitude <= 90) ? (float) $address->latitude : null;
+        $destLng = ($address && $address->longitude !== null && (float) $address->longitude != 0.0 && (float) $address->longitude >= -180 && (float) $address->longitude <= 180) ? (float) $address->longitude : null;
+        $destAddress = ($address && !empty(trim($address->full_address)))
+            ? trim($address->full_address)
+            : null;
+
+        $hasCoords = ($destLat !== null && $destLng !== null);
+        $hasAddress = !empty($destAddress);
+
+        if (!$hasCoords && !$hasAddress) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'CUSTOMER_COORDINATES_MISSING',
+                    'message' => 'Customer premise destination coordinates and address are not configured. Please set the customer location pin in Customer Details before starting navigation.',
+                ],
+            ], 400);
+        }
+
+        // Concurrency check: ONE technician = ONE active destination
+        $existing = $mapsTrackingService->getActiveDestination((string) $tech->id);
+        if ($existing && $existing['serviceId'] !== (string) $serviceId && !$request->boolean('confirmSwitch')) {
+            return response()->json([
+                'success' => false,
+                'conflict' => true,
+                'activeServiceId' => $existing['serviceId'],
+                'activeServiceNumber' => $existing['serviceNumber'] ?? 'Previous Service',
+                'message' => "You are currently navigating to Service {$existing['serviceNumber']}. Confirm switching active destination?",
+                'error' => [
+                    'code' => 'ACTIVE_NAVIGATION_EXISTS',
+                    'message' => "Technician already has an active navigation destination: " . ($existing['customerName'] ?? 'Another Destination'),
+                    'activeDestination' => $existing,
+                ],
+            ], 409);
+        }
+
+        $destinationRecord = $mapsTrackingService->setActiveDestination((string) $tech->id, [
+            'serviceId' => (string) $service->id,
+            'serviceNumber' => $service->service_number,
+            'jobCardId' => $service->jobCard ? (string) $service->jobCard->id : null,
+            'jobCardNumber' => $service->jobCard ? $service->jobCard->job_card_number : null,
+            'customerId' => (string) $service->customer->id,
+            'customerName' => $service->customer->full_name,
+            'customerPhone' => $service->customer->phone,
+            'address' => $destAddress,
+            'latitude' => $destLat,
+            'longitude' => $destLng,
+            'scheduledDate' => $service->scheduled_date,
+            'scheduledTimeSlot' => $service->scheduled_time_slot,
         ]);
+
+        $googleMapsUrl = $hasCoords
+            ? "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}&travelmode=driving"
+            : "https://www.google.com/maps/dir/?api=1&destination=" . urlencode($destAddress) . "&travelmode=driving";
+
+        return response()->json([
+            'success' => true,
+            'trackingStatus' => 'ON_THE_WAY',
+            'googleMapsUrl' => $googleMapsUrl,
+            'destination' => $destinationRecord,
+            'navigationUrl' => route('tech_portal.navigation', $service->id),
+            'data' => [
+                'trackingStatus' => 'ON_THE_WAY',
+                'googleMapsUrl' => $googleMapsUrl,
+                'destination' => $destinationRecord,
+                'navigationUrl' => route('tech_portal.navigation', $service->id),
+            ],
+        ]);
+    }
+
+    /**
+     * Start active navigation via POST body (API compatible)
+     */
+    public function startNavigationViaPost(Request $request, MapsTrackingService $mapsTrackingService)
+    {
+        $serviceId = $request->input('serviceId') ?? $request->input('service_id');
+        if (!$serviceId) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Service ID is required',
+                ],
+            ], 422);
+        }
+
+        return $this->startNavigation($request, $serviceId, $mapsTrackingService);
+    }
+
+    /**
+     * Save authoritative coordinates resolved by Google Maps client for the customer premise
+     */
+    public function saveDestinationCoordinates(Request $request, $serviceId, MapsTrackingService $mapsTrackingService)
+    {
+        $tech = $this->getCurrentTechnician();
+        if (!$tech && (!auth()->check() || !auth()->user()->hasRole('ADMIN'))) {
+            return response()->json(['success' => false, 'error' => 'UNAUTHORIZED'], 401);
+        }
+
+        $service = Service::with(['customer.addresses'])->findOrFail($serviceId);
+        $lat = $request->input('latitude') !== null ? (float) $request->input('latitude') : null;
+        $lng = $request->input('longitude') !== null ? (float) $request->input('longitude') : null;
+
+        if ($lat !== null && $lng !== null && $lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
+            $address = $service->customer ? ($service->customer->primaryAddress ?? $service->customer->addresses->first()) : null;
+            if ($address) {
+                $address->update([
+                    'latitude' => $lat,
+                    'longitude' => $lng,
+                ]);
+            }
+
+            // Also update active destination in temporary cache
+            $techId = $tech ? (string) $tech->id : ($service->technician_id ? (string) $service->technician_id : null);
+            if ($techId) {
+                $activeDest = $mapsTrackingService->getActiveDestination($techId);
+                if ($activeDest && ($activeDest['serviceId'] ?? null) === (string) $service->id) {
+                    $activeDest['latitude'] = $lat;
+                    $activeDest['longitude'] = $lng;
+                    $mapsTrackingService->setActiveDestination($techId, $activeDest);
+                }
+            }
+
+            return response()->json(['success' => true, 'latitude' => $lat, 'longitude' => $lng]);
+        }
+
+        return response()->json(['success' => false, 'error' => 'INVALID_COORDINATES'], 422);
     }
 
     /**
      * Stop active navigation / Check in as arrived
      */
-    public function stopNavigation(Request $request)
+    public function stopNavigation(Request $request, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
         if ($tech) {
             $status = $request->input('status', 'ARRIVED'); // ARRIVED or IDLE
-            $tech->update([
-                'tracking_status' => $status,
-            ]);
+            $mapsTrackingService->clearTracking((string) $tech->id);
+
+            if ($status === 'ARRIVED') {
+                $tech->update(['tracking_status' => 'ARRIVED']);
+            }
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Navigation status updated.',
+            'message' => 'Tracking terminated and temporary location state removed.',
         ]);
     }
 
     /**
-     * Real-time GPS Location Ping from Technician Phone
+     * Real-time GPS Location Ping from Technician Device
      */
-    public function updateGps(Request $request)
+    public function updateGps(Request $request, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
-        $techId = $request->input('technician_id') ?? ($tech ? $tech->id : null);
 
-        if (!$techId) {
-            $tech = Technician::first();
-            $techId = $tech ? $tech->id : null;
+        // Prevent unauthorized technician spoofing
+        if ($request->filled('technician_id') && $tech && (string) $request->input('technician_id') !== (string) $tech->id) {
+            if (!auth()->check() || !auth()->user()->hasRole('ADMIN')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'UNAUTHORIZED_SPOOFING_REJECTED',
+                        'message' => 'Technicians cannot publish location updates for another technician.',
+                    ],
+                ], 403);
+            }
+        }
+
+        if (!$tech && $request->filled('technician_id')) {
+            $tech = Technician::find($request->input('technician_id'));
+        }
+
+        if (!$tech) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'UNAUTHORIZED',
+                    'message' => 'Technician session is required to publish GPS coordinates',
+                ],
+            ], 401);
         }
 
         $validated = $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'accuracy' => 'nullable|numeric',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'accuracy' => 'nullable|numeric|min:0',
             'speed' => 'nullable|numeric',
             'heading' => 'nullable|numeric',
+            'timestamp' => 'nullable|numeric',
         ]);
 
-        $lat = (float) $validated['latitude'];
-        $lng = (float) $validated['longitude'];
+        $record = $mapsTrackingService->updateLocation(
+            (string) $tech->id,
+            $tech->full_name,
+            $tech->phone,
+            $validated
+        );
 
-        // Record breadcrumb point
-        TechnicianLocation::create([
-            'id' => (string) Str::uuid(),
-            'technician_id' => $techId,
-            'latitude' => $lat,
-            'longitude' => $lng,
-            'accuracy' => $validated['accuracy'] ?? 10,
-            'speed' => $validated['speed'] ?? 0,
-            'recorded_at' => now(),
+        return response()->json([
+            'success' => true,
+            'data' => $record,
+            'technicianId' => $tech->id,
+            'statusFreshness' => $record['statusFreshness'] ?? 'LIVE',
+            'distanceKm' => $record['distanceKm'] ?? null,
+            'etaMinutes' => $record['etaMinutes'] ?? null,
         ]);
+    }
 
-        $technician = Technician::find($techId);
-        if ($technician) {
-            $updates = [
-                'current_latitude' => $lat,
-                'current_longitude' => $lng,
-                'current_accuracy' => $validated['accuracy'] ?? 10,
-                'current_speed' => $validated['speed'] ?? 0,
-                'current_heading' => $validated['heading'] ?? 0,
-                'last_ping_at' => now(),
-            ];
-
-            if (!$technician->tracking_status || $technician->tracking_status === 'UNTRACKED') {
-                $updates['tracking_status'] = $technician->active_service_id ? 'ON_THE_WAY' : 'ACTIVE';
-            }
-
-            // Recompute distance and ETA if destination is set
-            if ($technician->destination_latitude && $technician->destination_longitude) {
-                $dist = TechnicianController::calculateDistanceKm($lat, $lng, $technician->destination_latitude, $technician->destination_longitude);
-                $eta = TechnicianController::estimateEtaMinutes($dist);
-                $updates['distance_km'] = $dist;
-                $updates['eta_minutes'] = $eta;
-            }
-
-            $technician->update($updates);
-
+    /**
+     * GET /api/v1/maps/technician/active
+     */
+    public function activeTracking(Request $request, MapsTrackingService $mapsTrackingService)
+    {
+        $tech = $this->getCurrentTechnician();
+        if (!$tech) {
             return response()->json([
-                'success' => true,
-                'technicianId' => $technician->id,
-                'statusFreshness' => $technician->statusFreshness,
-                'distanceKm' => $technician->distance_km,
-                'etaMinutes' => $technician->eta_minutes,
-            ]);
+                'success' => false,
+                'error' => [
+                    'code' => 'UNAUTHORIZED',
+                    'message' => 'Technician session required',
+                ],
+            ], 401);
         }
 
-        return response()->json(['success' => true]);
+        $record = $mapsTrackingService->getLocation((string) $tech->id);
+
+        return response()->json([
+            'success' => true,
+            'data' => $record,
+        ]);
     }
 
     /**
      * Legacy API Compatibility: POST /maps/technician/navigate
      */
-    public function apiStartNavigate(Request $request)
+    public function apiStartNavigate(Request $request, MapsTrackingService $mapsTrackingService)
     {
-        $serviceId = $request->input('serviceId') ?? $request->input('service_id');
-        return $this->startNavigation($request, $serviceId);
+        return $this->startNavigationViaPost($request, $mapsTrackingService);
     }
 
     /**
      * Legacy API Compatibility: POST /maps/technician/location
      */
-    public function apiLocationPing(Request $request)
+    public function apiLocationPing(Request $request, MapsTrackingService $mapsTrackingService)
     {
-        return $this->updateGps($request);
+        return $this->updateGps($request, $mapsTrackingService);
     }
 }

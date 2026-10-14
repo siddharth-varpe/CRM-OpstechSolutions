@@ -18,14 +18,18 @@
                         $statusColors = [
                             'COMPLETED' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
                             'IN_PROGRESS' => 'bg-amber-50 text-amber-700 border-amber-200',
+                            'ON_HOLD' => 'bg-amber-100 text-amber-800 border-amber-300',
                             'ASSIGNED' => 'bg-sky-50 text-sky-700 border-sky-200',
                             'SCHEDULED' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
                             'CANCELLED' => 'bg-slate-100 text-slate-600 border-slate-200',
                         ];
                         $st = $statusColors[$service->status] ?? 'bg-slate-50 text-slate-700 border-slate-200';
                     @endphp
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border {{ $st }}">
-                        {{ $service->status }}
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border {{ $st }}">
+                        @if($service->status === 'ON_HOLD')
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        @endif
+                        {{ $service->status === 'ON_HOLD' ? 'ON HOLD' : $service->status }}
                     </span>
                 </div>
                 <div class="text-xs text-slate-500 mt-0.5">
@@ -47,6 +51,18 @@
                 <span>{{ $service->technician ? 'Reassign Tech' : 'Assign Tech' }}</span>
             </button>
 
+            @if($service->status === 'ON_HOLD')
+                <button onclick="updateAdminStatus('IN_PROGRESS', 'Resumed by admin')" class="btn-primary flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white shadow-2xs">
+                    <i data-lucide="play-circle" class="w-4 h-4"></i>
+                    <span>Resume Service</span>
+                </button>
+            @elseif($service->status !== 'COMPLETED' && $service->status !== 'CANCELLED')
+                <button onclick="CRM.openModal('modalHoldServiceAdmin')" class="btn-outline flex items-center gap-2 text-amber-700 border-amber-300 hover:bg-amber-50">
+                    <i data-lucide="pause-circle" class="w-4 h-4 text-amber-600"></i>
+                    <span>Hold Service</span>
+                </button>
+            @endif
+
             @if($service->status !== 'COMPLETED' && $service->status !== 'CANCELLED')
                 <button onclick="CRM.openModal('modalCompleteService')" class="btn-primary flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700">
                     <i data-lucide="check-circle" class="w-4 h-4"></i>
@@ -55,6 +71,29 @@
             @endif
         </div>
     </div>
+
+    @if($service->status === 'ON_HOLD')
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                    <i data-lucide="pause-circle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded font-mono">Service On Hold</span>
+                        <span class="text-xs text-slate-500">Technician field work currently paused</span>
+                    </div>
+                    @if($service->internal_notes)
+                        <p class="text-xs text-amber-900 mt-1 font-mono whitespace-pre-line">{{ $service->internal_notes }}</p>
+                    @endif
+                </div>
+            </div>
+            <button onclick="updateAdminStatus('IN_PROGRESS', 'Resumed by admin')" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-2xs">
+                <i data-lucide="play-circle" class="w-4 h-4"></i>
+                <span>Resume (In Progress)</span>
+            </button>
+        </div>
+    @endif
 
     <!-- Service Details & Status Banner -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -312,5 +351,71 @@ $(document).ready(function() {
         setTimeout(() => location.reload(), 600);
     });
 });
+
+function submitHoldServiceAdmin(e) {
+    e.preventDefault();
+    const reason = $('#adminHoldReason').val() || 'Service put on hold by admin';
+    updateAdminStatus('ON_HOLD', reason);
+    CRM.closeModal('modalHoldServiceAdmin');
+}
+
+function updateAdminStatus(status, reason) {
+    $.ajax({
+        url: "{{ route('services.status', $service->id) }}",
+        type: 'POST',
+        data: {
+            _token: "{{ csrf_token() }}",
+            status: status,
+            reason: reason || ''
+        },
+        success: function(res) {
+            CRM.toast(res.message || 'Status updated.', 'success');
+            setTimeout(() => location.reload(), 500);
+        },
+        error: function(xhr) {
+            const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to update status.';
+            CRM.toast(msg, 'error');
+        }
+    });
+}
 </script>
+
+<!-- Modal: Hold Service (Admin) -->
+<div id="modalHoldServiceAdmin" class="modal-backdrop hidden">
+    <div class="modal-box max-w-md">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2 text-amber-600">
+                <i data-lucide="pause-circle" class="w-5 h-5"></i>
+                <span>Put Service on Hold</span>
+            </h3>
+            <button onclick="CRM.closeModal('modalHoldServiceAdmin')" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form onsubmit="submitHoldServiceAdmin(event)" class="mt-4 space-y-4">
+            <p class="text-xs text-slate-600">
+                Mark service <span class="font-mono font-bold text-slate-900">{{ $service->service_number }}</span> as ON HOLD. The technician portal and technician panel will update immediately.
+            </p>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Reason for Hold <span class="text-rose-500">*</span></label>
+                <textarea id="adminHoldReason" rows="3" required class="form-input text-xs" placeholder="e.g. Waiting for spare part delivery, customer rescheduling..."></textarea>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="$('#adminHoldReason').val('Awaiting spare parts from vendor')" class="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700">Spare Parts Awaited</button>
+                <button type="button" onclick="$('#adminHoldReason').val('Customer requested reschedule to a later date')" class="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700">Customer Reschedule</button>
+                <button type="button" onclick="$('#adminHoldReason').val('Pending site approval / Customer premise locked')" class="text-[10px] px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700">Premise Locked</button>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button type="button" onclick="CRM.closeModal('modalHoldServiceAdmin')" class="btn-outline">Cancel</button>
+                <button type="submit" class="btn-primary bg-amber-600 hover:bg-amber-700 text-white">
+                    Confirm Hold
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection

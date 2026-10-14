@@ -64,9 +64,9 @@
                 <i data-lucide="phone-call" class="w-4 h-4 text-slate-500"></i>
                 <span>Call</span>
             </a>
-            <button type="button" onclick="openModal('edit-customer-modal')" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors">
+            <button type="button" onclick="openCustomerEditModal()" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer">
                 <i data-lucide="edit-3" class="w-4 h-4"></i>
-                <span>Edit</span>
+                <span>Edit Profile &amp; Location</span>
             </button>
         </div>
     </div>
@@ -246,8 +246,11 @@
     <!-- Tab 4: Addresses -->
     <div id="tab-addresses" class="tab-pane hidden space-y-4">
         <div class="flex items-center justify-between">
-            <h2 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Registered Delivery &amp; Service Locations</h2>
-            <button type="button" onclick="openModal('add-address-modal')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors">
+            <div>
+                <h2 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Registered Delivery &amp; Service Locations</h2>
+                <p class="text-[11px] text-slate-500">Destination coordinates used for technician navigation and dispatch map routing</p>
+            </div>
+            <button type="button" onclick="openAddAddressModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors cursor-pointer">
                 <i data-lucide="plus" class="w-4 h-4"></i>
                 <span>Add Additional Address</span>
             </button>
@@ -255,23 +258,56 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             @foreach($customer->addresses as $addr)
-                <div class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card">
-                    <div class="flex items-center justify-between">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">
-                            {{ $addr->address_type }} ADDRESS
-                        </span>
-                        @if($addr->is_default)
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary-50 text-primary-700 border border-primary-200">
-                                PRIMARY
+                <div class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700">
+                                {{ $addr->address_type }} ADDRESS
                             </span>
+                            @if($addr->is_default)
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-primary-50 text-primary-700 border border-primary-200">
+                                    PRIMARY / DEFAULT
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-xs text-slate-800 font-semibold mt-2 leading-relaxed">
+                            {{ $addr->address_line1 }}<br>
+                            @if($addr->address_line2) {{ $addr->address_line2 }}<br> @endif
+                            @if($addr->landmark) Landmark: {{ $addr->landmark }}<br> @endif
+                            {{ $addr->city }}, {{ $addr->state }} - {{ $addr->postal_code }}
+                        </p>
+                    </div>
+
+                    <!-- Destination Coordinates Bar -->
+                    <div class="mt-3 pt-2.5 border-t border-slate-100">
+                        @if($addr->latitude && $addr->longitude)
+                            <div class="flex items-center justify-between text-[11px] bg-emerald-50/70 p-2 rounded-lg border border-emerald-200/60 font-mono">
+                                <span class="text-emerald-800 font-semibold flex items-center gap-1 truncate mr-2">
+                                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+                                    <span class="truncate">{{ number_format($addr->latitude, 6) }}, {{ number_format($addr->longitude, 6) }}</span>
+                                </span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <a href="https://www.google.com/maps/dir/?api=1&destination={{ $addr->latitude }},{{ $addr->longitude }}&travelmode=driving" target="_blank" class="text-primary-700 hover:text-primary-900 font-bold hover:underline flex items-center gap-0.5" title="Test destination in Google Maps">
+                                        <span>Test Nav</span>
+                                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                                    </a>
+                                    <button type="button" onclick="openCustomerEditModal()" class="text-slate-600 hover:text-slate-900 font-bold hover:underline">
+                                        Edit Pin
+                                    </button>
+                                </div>
+                            </div>
+                        @else
+                            <div class="flex items-center justify-between text-[11px] bg-amber-50/80 p-2 rounded-lg border border-amber-200/70">
+                                <span class="text-amber-800 font-medium flex items-center gap-1">
+                                    <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-600"></i>
+                                    GPS pin not configured (approximate only)
+                                </span>
+                                <button type="button" onclick="openCustomerEditModal()" class="text-primary-700 hover:text-primary-900 font-bold hover:underline font-mono">
+                                    Set Exact Pin &rarr;
+                                </button>
+                            </div>
                         @endif
                     </div>
-                    <p class="text-xs text-slate-800 font-semibold mt-2 leading-relaxed">
-                        {{ $addr->address_line1 }}<br>
-                        @if($addr->address_line2) {{ $addr->address_line2 }}<br> @endif
-                        @if($addr->landmark) Landmark: {{ $addr->landmark }}<br> @endif
-                        {{ $addr->city }}, {{ $addr->state }} - {{ $addr->postal_code }}
-                    </p>
                 </div>
             @endforeach
         </div>
@@ -328,7 +364,231 @@
     </div>
 </div>
 
+<!-- Modal: Edit Customer Profile & Primary Premise Coordinates -->
+<div id="edit-customer-modal" class="hidden fixed inset-0 z-50 modal-backdrop items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-modal border border-slate-200 max-w-xl w-full max-h-[92vh] overflow-y-auto fade-in">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+            <div class="flex items-center gap-2">
+                <i data-lucide="edit-3" class="w-5 h-5 text-primary-600"></i>
+                <h3 class="font-display font-extrabold text-sm text-slate-900 uppercase tracking-wider">Edit Customer &amp; Pinpoint Location</h3>
+            </div>
+            <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeModal('edit-customer-modal')">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form action="{{ route('customers.update', $customer->id) }}" method="POST" data-ajax="true" class="p-5 space-y-4">
+            @csrf
+            @method('PUT')
+
+            <!-- Full Name & Phone -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Contact Person / Full Name *</label>
+                    <input type="text" name="full_name" required value="{{ $customer->full_name }}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Mobile Phone Number *</label>
+                    <input type="tel" name="phone" required value="{{ $customer->phone }}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Email & Label -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                    <input type="email" name="email" value="{{ $customer->email }}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Customer Label</label>
+                    <select name="customer_label" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option value="GOOD" {{ $customer->customer_label === 'GOOD' ? 'selected' : '' }}>Good / VIP</option>
+                        <option value="BAD" {{ $customer->customer_label === 'BAD' ? 'selected' : '' }}>High Risk / Followup</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Customer Type & Status -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Customer Type</label>
+                    <select name="customer_type" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option value="INDIVIDUAL" {{ $customer->customer_type === 'INDIVIDUAL' ? 'selected' : '' }}>Individual</option>
+                        <option value="COMMERCIAL" {{ $customer->customer_type === 'COMMERCIAL' ? 'selected' : '' }}>Commercial / Corporate</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Account Status</label>
+                    <select name="status" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option value="ACTIVE" {{ $customer->status === 'ACTIVE' ? 'selected' : '' }}>Active</option>
+                        <option value="INACTIVE" {{ $customer->status === 'INACTIVE' ? 'selected' : '' }}>Inactive</option>
+                    </select>
+                </div>
+            </div>
+
+            @php $primaryAddr = $customer->primaryAddress ?? $customer->addresses->first(); @endphp
+
+            <!-- Primary Service Address Header -->
+            <div class="pt-2 border-t border-slate-100">
+                <span class="block text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-2">Primary Service Address</span>
+                <div class="space-y-2.5">
+                    <div>
+                        <input type="text" name="address_line1" required value="{{ $primaryAddr->address_line1 ?? '' }}" placeholder="Flat / Shop No., Building Name, Street Address *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <input type="text" name="address_line2" value="{{ $primaryAddr->address_line2 ?? '' }}" placeholder="Area / Colony" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <input type="text" name="landmark" value="{{ $primaryAddr->landmark ?? '' }}" placeholder="Nearest Landmark" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    </div>
+                    <div class="grid grid-cols-3 gap-2.5">
+                        <input type="text" name="city" required value="{{ $primaryAddr->city ?? 'Pune' }}" placeholder="City *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <input type="text" name="state" required value="{{ $primaryAddr->state ?? 'Maharashtra' }}" placeholder="State *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <input type="text" name="postal_code" required value="{{ $primaryAddr->postal_code ?? '' }}" placeholder="Pincode *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Precision Location Picker with Saved Coordinates -->
+            @include('customers.partials.location_picker', [
+                'prefix' => 'customer_edit',
+                'initialLat' => $primaryAddr->latitude ?? null,
+                'initialLng' => $primaryAddr->longitude ?? null,
+            ])
+
+            <!-- Notes -->
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Operational Notes</label>
+                <textarea name="notes" rows="2" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">{{ $customer->notes }}</textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" class="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50" onclick="closeModal('edit-customer-modal')">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold shadow-md transition-colors">
+                    Save Profile &amp; Location
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Additional Address -->
+<div id="add-address-modal" class="hidden fixed inset-0 z-50 modal-backdrop items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-modal border border-slate-200 max-w-xl w-full max-h-[92vh] overflow-y-auto fade-in">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+            <div class="flex items-center gap-2">
+                <i data-lucide="map-pin" class="w-5 h-5 text-primary-600"></i>
+                <h3 class="font-display font-extrabold text-sm text-slate-900 uppercase tracking-wider">Add Additional Address &amp; GPS Pin</h3>
+            </div>
+            <button type="button" class="text-slate-400 hover:text-slate-600" onclick="closeModal('add-address-modal')">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form action="{{ route('customers.addresses.store', $customer->id) }}" method="POST" data-ajax="true" class="p-5 space-y-4">
+            @csrf
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Address Classification *</label>
+                    <select name="address_type" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                        <option value="SERVICE">Service / Delivery Address</option>
+                        <option value="BILLING">Billing Address</option>
+                        <option value="BOTH">Both Service &amp; Billing</option>
+                    </select>
+                </div>
+                <div class="flex items-center pt-5">
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input type="checkbox" name="is_default" value="1" class="rounded border-slate-300 text-primary-600">
+                        <span>Set as Default Primary Address</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="space-y-2.5">
+                <div>
+                    <input type="text" name="address_line1" required placeholder="Flat / Shop No., Building Name, Street Address *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <input type="text" name="address_line2" placeholder="Area / Colony" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    <input type="text" name="landmark" placeholder="Nearest Landmark" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-3 gap-2.5">
+                    <input type="text" name="city" required value="Pune" placeholder="City *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    <input type="text" name="state" required value="Maharashtra" placeholder="State *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    <input type="text" name="postal_code" required placeholder="Pincode *" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Location Picker for Additional Address -->
+            @include('customers.partials.location_picker', [
+                'prefix' => 'addr_add',
+                'initialLat' => null,
+                'initialLng' => null,
+            ])
+
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" class="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50" onclick="closeModal('add-address-modal')">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold shadow-md transition-colors">
+                    Save Address &amp; Location
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function openCustomerEditModal() {
+    openModal('edit-customer-modal');
+    setTimeout(function() {
+        if (!window.locationPicker_customer_edit) {
+            window.initLocationPicker({
+                prefix: 'customer_edit',
+                initialLat: {{ ($customer->primaryAddress->latitude ?? null) ? (float)$customer->primaryAddress->latitude : 'null' }},
+                initialLng: {{ ($customer->primaryAddress->longitude ?? null) ? (float)$customer->primaryAddress->longitude : 'null' }},
+                getAddressString: function() {
+                    const form = document.querySelector('#edit-customer-modal form');
+                    if (!form) return '';
+                    const parts = [
+                        form.querySelector('[name="address_line1"]')?.value,
+                        form.querySelector('[name="address_line2"]')?.value,
+                        form.querySelector('[name="landmark"]')?.value,
+                        form.querySelector('[name="city"]')?.value,
+                        form.querySelector('[name="postal_code"]')?.value
+                    ].filter(Boolean);
+                    return parts.join(', ');
+                }
+            });
+        } else {
+            window.locationPicker_customer_edit.invalidate();
+        }
+    }, 200);
+}
+
+function openAddAddressModal() {
+    openModal('add-address-modal');
+    setTimeout(function() {
+        if (!window.locationPicker_addr_add) {
+            window.initLocationPicker({
+                prefix: 'addr_add',
+                getAddressString: function() {
+                    const form = document.querySelector('#add-address-modal form');
+                    if (!form) return '';
+                    const parts = [
+                        form.querySelector('[name="address_line1"]')?.value,
+                        form.querySelector('[name="address_line2"]')?.value,
+                        form.querySelector('[name="landmark"]')?.value,
+                        form.querySelector('[name="city"]')?.value,
+                        form.querySelector('[name="postal_code"]')?.value
+                    ].filter(Boolean);
+                    return parts.join(', ');
+                }
+            });
+        } else {
+            window.locationPicker_addr_add.invalidate();
+        }
+    }, 200);
+}
+
 $(document).ready(function() {
     // Tab Switching
     $('.tab-btn').on('click', function() {
