@@ -132,12 +132,6 @@
 
         <!-- Right Action Buttons -->
         <div class="flex items-center gap-2.5">
-            <a href="{{ route('technicians.map') }}"
-               class="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs">
-                <i data-lucide="map-pin" class="w-4 h-4"></i>
-                <span>Open Live Map</span>
-            </a>
-
             <button type="button"
                     onclick="openModal('addTechnicianModal')"
                     class="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs">
