@@ -43,7 +43,7 @@
               mono: ['JetBrains Mono', 'monospace'],
             },
             boxShadow: {
-              'elevated': '0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04)',
+              'elevated': 'none',
             }
           }
         }
@@ -66,7 +66,7 @@
     <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <!-- Logo and Branding Header in Admin Theme -->
         <div class="inline-flex items-center justify-center gap-3 mb-3">
-            <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 shadow-sm flex items-center justify-center p-1.5">
+            <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-center p-1.5">
                 <img src="{{ asset('assets/crm-logo.png') }}" alt="Enterprises CRM Logo" class="w-full h-full object-contain">
             </div>
             <div class="text-left">
@@ -80,7 +80,7 @@
     </div>
 
     <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white border border-slate-200/90 rounded-2xl shadow-elevated p-6 sm:p-8 space-y-6">
+        <div class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 space-y-6">
             
             <form id="formTechPinLogin" action="{{ route('tech_portal.authenticate') }}" method="POST" class="space-y-4">
                 @csrf

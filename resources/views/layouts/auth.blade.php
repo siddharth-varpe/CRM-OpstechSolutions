@@ -55,7 +55,7 @@
               display: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
             },
             boxShadow: {
-              'elevated': '0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04)',
+              'elevated': 'none',
             }
           }
         }
@@ -75,7 +75,7 @@
     
     <!-- Footer -->
     <footer class="pt-4 pb-2 text-center text-xs text-slate-500 font-medium flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2">
-        <span>&copy; {{ date('Y') }} Enterprises CRM. All Rights Reserved. Commercial Water Purification SaaS.</span>
+        <span>&copy; {{ date('Y') }} Enterprises CRM. All Rights Reserved. Enterprise CRM &amp; Operations Platform.</span>
         <span class="hidden sm:inline text-slate-300">&bull;</span>
         <span class="font-mono text-[11px] text-slate-400">v{{ config('app.version', '1.0.0') }}</span>
     </footer>

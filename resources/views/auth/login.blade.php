@@ -1,21 +1,21 @@
 @extends('layouts.auth')
 
 @section('content')
-<div class="w-full max-w-[1360px] mx-auto my-auto bg-white rounded-2xl shadow-elevated border border-slate-200/90 overflow-hidden flex flex-col lg:flex-row lg:max-h-[90vh]">
+<div class="w-full max-w-[1360px] mx-auto my-auto bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col lg:flex-row lg:max-h-[90vh]">
     <!-- Left Visual Identity Panel (54% Width) -->
     <div class="relative w-full lg:w-[54%] bg-[#0B132B] text-white flex flex-col justify-between p-4 sm:p-7 lg:p-8 overflow-hidden select-none">
         <!-- High-Fidelity Background Visual Scene -->
         <div class="absolute inset-0 z-0">
-            <img src="{{ asset('assets/ro-purifier-bg.jpg') }}" alt="Enterprises CRM Management System" class="w-full h-full object-cover object-center">
-            <!-- Hydro-Dark Gradient Overlays for High-Contrast Clarity -->
-            <div class="absolute inset-0 bg-gradient-to-r from-[#0B132B]/95 via-[#0F294A]/80 to-[#0284C7]/40 pointer-events-none"></div>
-            <div class="absolute inset-0 bg-gradient-to-t from-[#070C1B]/95 via-transparent to-black/40 pointer-events-none"></div>
+            <img src="{{ asset('assets/enterprise-crm-bg.jpg') }}" alt="Enterprises CRM Management System" class="w-full h-full object-cover object-center">
+            <!-- Modern Deep Navy & Corporate Gradient Overlays for High-Contrast Clarity -->
+            <div class="absolute inset-0 bg-gradient-to-r from-[#0B132B]/90 via-[#0B132B]/75 to-[#0F294A]/60 pointer-events-none"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-[#070C1B]/95 via-transparent to-black/30 pointer-events-none"></div>
         </div>
 
         <!-- Top Left Branding Header -->
         <div class="relative z-10 flex items-center gap-3">
-            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/10 backdrop-blur-xs border border-white/20 shadow-md flex items-center justify-center shrink-0 p-1">
-                <img src="{{ asset('assets/crm-logo.png') }}" alt="Enterprises CRM Logo" class="w-full h-full object-contain select-none drop-shadow">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/10 backdrop-blur-xs border border-white/20 flex items-center justify-center shrink-0 p-1">
+                <img src="{{ asset('assets/crm-logo.png') }}" alt="Enterprises CRM Logo" class="w-full h-full object-contain select-none">
             </div>
             <div>
                 <span class="block text-xs sm:text-sm lg:text-base font-display font-extrabold tracking-wider text-white uppercase leading-tight">
@@ -32,10 +32,10 @@
         <!-- Center Left Marketing Message -->
         <div class="relative z-10 max-w-sm my-auto py-3 sm:py-6">
             <span class="block text-xs sm:text-sm font-semibold text-sky-300">Welcome to</span>
-            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-white tracking-tight mt-1 leading-tight drop-shadow-sm">
+            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-white tracking-tight mt-1 leading-tight">
                 Enterprises CRM
             </h1>
-            <p class="text-xs sm:text-sm text-slate-200 font-normal mt-2.5 leading-relaxed drop-shadow-xs">
+            <p class="text-xs sm:text-sm text-slate-200 font-normal mt-2.5 leading-relaxed">
                 A smart CRM to manage your business customers, sales, invoices, services, payments and more — all in one place.
             </p>
         </div>
@@ -43,7 +43,7 @@
         <!-- Bottom Feature Bar (4 Horizontally Arranged Items with Vertical Separators) -->
         <div class="relative z-10 pt-3 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-3 items-start backdrop-blur-xs">
             <div class="flex flex-col items-center sm:items-start text-center sm:text-left">
-                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit shadow-2xs">
+                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit">
                     <i data-lucide="users" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-300"></i>
                 </div>
                 <h2 class="text-[11px] sm:text-xs font-bold text-white leading-tight">Manage Customers</h2>
@@ -51,7 +51,7 @@
             </div>
 
             <div class="flex flex-col items-center sm:items-start text-center sm:text-left sm:border-l sm:border-white/15 sm:pl-2.5">
-                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit shadow-2xs">
+                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit">
                     <i data-lucide="shopping-cart" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-300"></i>
                 </div>
                 <h2 class="text-[11px] sm:text-xs font-bold text-white leading-tight">Track Sales</h2>
@@ -59,7 +59,7 @@
             </div>
 
             <div class="flex flex-col items-center sm:items-start text-center sm:text-left sm:border-l sm:border-white/15 sm:pl-2.5">
-                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit shadow-2xs">
+                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit">
                     <i data-lucide="file-text" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-300"></i>
                 </div>
                 <h2 class="text-[11px] sm:text-xs font-bold text-white leading-tight">Invoices</h2>
@@ -67,7 +67,7 @@
             </div>
 
             <div class="flex flex-col items-center sm:items-start text-center sm:text-left sm:border-l sm:border-white/15 sm:pl-2.5">
-                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit shadow-2xs">
+                <div class="mb-1 p-1 rounded-lg bg-white/10 border border-white/15 text-white w-fit">
                     <i data-lucide="wrench" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-300"></i>
                 </div>
                 <h2 class="text-[11px] sm:text-xs font-bold text-white leading-tight">Services</h2>
@@ -165,7 +165,7 @@
                         Security Verification
                     </label>
                     <div class="flex items-center gap-3 mb-2">
-                        <div id="captcha-container" class="border border-slate-200 rounded-xl overflow-hidden shadow-2xs shrink-0 bg-white">
+                        <div id="captcha-container" class="border border-slate-200 rounded-xl overflow-hidden shrink-0 bg-white">
                             {!! $captchaSvg !!}
                         </div>
                         <button
@@ -192,7 +192,7 @@
                 <button
                     type="submit"
                     id="submit-btn"
-                    class="w-full mt-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-150 flex items-center justify-center gap-2"
+                    class="w-full mt-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-150 flex items-center justify-center gap-2"
                 >
                     <span>Sign In</span>
                     <i data-lucide="arrow-right" class="w-4 h-4"></i>
