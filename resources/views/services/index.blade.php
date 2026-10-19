@@ -328,10 +328,19 @@
                             </td>
 
                             <td class="py-3.5 px-4 text-right">
-                                <a href="{{ route('services.show', $s->id) }}" class="btn-outline py-1 px-3 text-xs inline-flex items-center gap-1.5">
-                                    <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500"></i>
-                                    <span>Details</span>
-                                </a>
+                                <div class="inline-flex items-center justify-end gap-1.5">
+                                    <a href="{{ route('services.show', $s->id) }}" class="btn-outline py-1 px-2.5 text-xs inline-flex items-center gap-1" title="View Details">
+                                        <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500"></i>
+                                        <span>Details</span>
+                                    </a>
+                                    <button type="button" 
+                                            onclick="confirmDeleteService('{{ $s->id }}', '{{ $s->service_number }}')" 
+                                            class="btn-outline py-1 px-2 text-xs inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 transition-colors" 
+                                            title="Delete Scheduled Service">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                        <span>Delete</span>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     @empty
@@ -373,13 +382,41 @@
         <form id="formScheduleService" action="{{ route('services.store') }}" method="POST" class="mt-4 space-y-4">
             @csrf
             <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Customer <span class="text-rose-500">*</span></label>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                    Customer <span class="text-rose-500">*</span>
+                </label>
+
+                <!-- Search Bar for Registered Customers -->
+                <div class="relative mb-2">
+                    <input type="text" 
+                           id="serviceCustomerSearch" 
+                           placeholder="Search customer by name, phone, or customer #..." 
+                           autocomplete="off"
+                           class="form-input text-sm pl-9 pr-8"
+                           aria-label="Search registered customers">
+                    <div class="absolute left-3 top-2.5 text-slate-400 pointer-events-none">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                    </div>
+                    <button type="button" 
+                            id="btnClearServiceCustomerSearch" 
+                            class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                            title="Clear search">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Customer Dropdown just below it -->
                 <select name="customer_id" id="serviceCustomerSelect" required class="form-input text-sm">
                     <option value="">Select Customer</option>
                     @foreach($customers as $c)
-                        <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->phone }})</option>
+                        <option value="{{ $c->id }}"
+                                data-search="{{ strtolower(($c->full_name ?? $c->name) . ' ' . $c->phone . ' ' . ($c->customer_number ?? '') . ' ' . ($c->company_name ?? '')) }}"
+                                {{ (request('customer_id') == $c->id) ? 'selected' : '' }}>
+                            {{ $c->full_name ?? $c->name }} ({{ $c->phone }}){{ $c->company_name ? ' - ' . $c->company_name : ($c->customer_number ? ' [' . $c->customer_number . ']' : '') }}
+                        </option>
                     @endforeach
                 </select>
+                <div id="serviceCustomerSearchHelp" class="text-[11px] text-slate-500 mt-1 hidden"></div>
             </div>
 
             <!-- Machine / Asset Selection & Direct Quick-Add -->
@@ -697,10 +734,19 @@ function selectHeatmapDate(dateStr) {
                             </div>
                             <div class="text-[10px] text-slate-400 font-mono">${s.technician_phone || 'No direct phone'}</div>
                         </div>
-                        <a href="${s.url}" class="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1 bg-white hover:bg-slate-50">
-                            <span>Details</span>
-                            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-                        </a>
+                        <div class="flex items-center gap-1.5">
+                            <a href="${s.url}" class="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1 bg-white hover:bg-slate-50">
+                                <span>Details</span>
+                                <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                            </a>
+                            <button type="button" 
+                                    onclick="confirmDeleteService('${s.id}', '${s.service_number}')" 
+                                    class="btn-outline text-xs py-1.5 px-2.5 inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 bg-white transition-colors" 
+                                    title="Delete Scheduled Service">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                <span>Delete</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `);
@@ -856,10 +902,125 @@ $(document).ready(function() {
         });
     }
 
-    $('#serviceCustomerSelect').on('change', function() {
+    // 3. Customer search & dynamic asset retrieval
+    const $customerSelect = $('#serviceCustomerSelect');
+    const $customerSearch = $('#serviceCustomerSearch');
+    const $clearCustomerSearch = $('#btnClearServiceCustomerSearch');
+    const $customerSearchHelp = $('#serviceCustomerSearchHelp');
+
+    const customerOptionsList = [];
+    $customerSelect.find('option').each(function() {
+        const val = $(this).val();
+        customerOptionsList.push({
+            value: val,
+            text: $(this).text(),
+            search: ($(this).data('search') || $(this).text()).toString().toLowerCase(),
+            isPlaceholder: (val === '')
+        });
+    });
+
+    function filterCustomerSelect(query) {
+        const currentVal = $customerSelect.val();
+        query = (query || '').trim().toLowerCase();
+
+        if (query.length > 0) {
+            $clearCustomerSearch.removeClass('hidden');
+        } else {
+            $clearCustomerSearch.addClass('hidden');
+            $customerSearchHelp.addClass('hidden').html('');
+        }
+
+        const placeholder = customerOptionsList.find(o => o.isPlaceholder) || { value: '', text: 'Select Customer' };
+
+        if (!query) {
+            $customerSelect.empty();
+            $customerSelect.append(new Option(placeholder.text, placeholder.value));
+            customerOptionsList.filter(o => !o.isPlaceholder).forEach(function(opt) {
+                const isSelected = (opt.value === currentVal && currentVal !== '');
+                $customerSelect.append(new Option(opt.text, opt.value, isSelected, isSelected));
+            });
+            if (currentVal) {
+                $customerSelect.val(currentVal);
+            }
+            return;
+        }
+
+        const matches = customerOptionsList.filter(function(opt) {
+            return !opt.isPlaceholder && opt.search.includes(query);
+        });
+
+        $customerSelect.empty();
+
+        if (matches.length === 0) {
+            $customerSelect.append(new Option('No registered customers match "' + query + '"', '', true, true));
+            $customerSearchHelp.removeClass('hidden').html(
+                '<span class="text-rose-500 font-medium">No registered customers found matching "' + $('<div>').text(query).html() + '"</span>'
+            );
+            loadCustomerAssets(null);
+        } else {
+            $customerSelect.append(new Option('-- Select Customer (' + matches.length + ' matching) --', ''));
+            let matchedPrev = false;
+            matches.forEach(function(opt) {
+                const isSelected = (opt.value === currentVal && currentVal !== '');
+                if (isSelected) matchedPrev = true;
+                $customerSelect.append(new Option(opt.text, opt.value, isSelected, isSelected));
+            });
+
+            if (matches.length === 1) {
+                $customerSelect.val(matches[0].value);
+                loadCustomerAssets(matches[0].value);
+            } else if (!matchedPrev) {
+                $customerSelect.val('');
+                loadCustomerAssets(null);
+            }
+
+            $customerSearchHelp.removeClass('hidden').html(
+                '<span class="text-slate-500">Found ' + matches.length + ' matching registered customer' + (matches.length > 1 ? 's' : '') + '</span>'
+            );
+        }
+    }
+
+    $customerSearch.on('input', function() {
+        filterCustomerSelect($(this).val());
+    });
+
+    $customerSearch.on('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $customerSelect.focus();
+        }
+    });
+
+    $clearCustomerSearch.on('click', function() {
+        $customerSearch.val('');
+        filterCustomerSelect('');
+        $customerSearch.focus();
+    });
+
+    $customerSelect.on('change', function() {
         const custId = $(this).val();
         loadCustomerAssets(custId);
     });
+
+    // Handle URL action=schedule/create & customer_id pre-selection
+    const serviceUrlParams = new URLSearchParams(window.location.search);
+    if (serviceUrlParams.get('action') === 'schedule' || serviceUrlParams.get('action') === 'create') {
+        CRM.openModal('modalScheduleService');
+        const cid = serviceUrlParams.get('customer_id');
+        const aid = serviceUrlParams.get('asset_id');
+        if (cid) {
+            $customerSelect.val(cid);
+            loadCustomerAssets(cid, aid);
+        }
+    } else if (serviceUrlParams.get('customer_id')) {
+        const cid = serviceUrlParams.get('customer_id');
+        $customerSelect.val(cid);
+        loadCustomerAssets(cid);
+    }
+
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
 
     // Clear custom asset input if dropdown option is selected
     $('#serviceAssetSelect').on('change', function() {
@@ -899,6 +1060,45 @@ $(document).ready(function() {
         setTimeout(() => location.reload(), 600);
     });
 });
+
+window.confirmDeleteService = function(serviceId, serviceNumber) {
+    if (!confirm(`Are you sure you want to delete scheduled service ${serviceNumber}? This action cannot be undone.`)) {
+        return;
+    }
+
+    $.ajax({
+        url: `/services/${serviceId}`,
+        type: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        data: {
+            _token: '{{ csrf_token() }}'
+        },
+        success: function(res) {
+            if (window.showToast) {
+                window.showToast(res.message || `Scheduled service ${serviceNumber} deleted successfully.`, 'success');
+            } else if (typeof CRM !== 'undefined' && CRM.toast) {
+                CRM.toast(res.message || `Scheduled service ${serviceNumber} deleted successfully.`, 'success');
+            } else {
+                alert(res.message || `Scheduled service ${serviceNumber} deleted successfully.`);
+            }
+            setTimeout(function() {
+                window.location.reload();
+            }, 400);
+        },
+        error: function(xhr) {
+            const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to delete scheduled service.';
+            if (window.showToast) {
+                window.showToast(msg, 'danger');
+            } else if (typeof CRM !== 'undefined' && CRM.toast) {
+                CRM.toast(msg, 'error');
+            } else {
+                alert(msg);
+            }
+        }
+    });
+};
 </script>
 @endsection
 

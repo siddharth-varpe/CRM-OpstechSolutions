@@ -23,11 +23,11 @@
         #sigCanvas { touch-action: none; }
     </style>
 </head>
-<body class="min-h-screen bg-[#F4F6F8] text-slate-800 flex flex-col antialiased select-none pb-20">
+<body class="min-h-screen bg-[#F4F6F8] text-slate-800 flex flex-col antialiased select-none pb-20 overflow-x-hidden">
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
 
     <!-- Top Header in Admin Theme -->
-    <header class="bg-[#00152B] text-white border-b border-slate-800 px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-md">
+    <header class="bg-[#00152B] text-white border-b border-slate-800 px-3.5 sm:px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-md">
         <a href="{{ route('tech_portal.dashboard') }}?tab=assigned" class="flex items-center gap-2 text-slate-300 hover:text-white transition">
             <i data-lucide="arrow-left" class="w-5 h-5"></i>
             <span class="text-xs font-semibold">Back to Assigned</span>
@@ -38,59 +38,64 @@
     </header>
 
     <!-- Execution Form Container -->
-    <main class="flex-1 max-w-xl w-full mx-auto p-4 space-y-4 pb-24">
+    <main class="flex-1 max-w-xl w-full mx-auto px-3 py-4 sm:px-4 sm:py-5 space-y-3.5 sm:space-y-4 pb-24 overflow-x-hidden">
         <!-- Customer & Location Card -->
         @php
             $addrStr = '';
-            if ($service->customer && $service->customer->addresses->isNotEmpty()) {
-                $addr = $service->customer->addresses->first();
+            $addr = null;
+            if ($service->customer && $service->customer->addresses && $service->customer->addresses->isNotEmpty()) {
+                $addr = $service->customer->addresses->firstWhere('is_default', true) ?? $service->customer->addresses->first();
+            } elseif ($service->asset && $service->asset->installationAddress && (!$service->customer_id || $service->asset->customer_id === $service->customer_id)) {
+                $addr = $service->asset->installationAddress;
+            }
+            if ($addr) {
                 $addrStr = $addr->full_address ?: "{$addr->address_line1}, {$addr->city} {$addr->postal_code}";
             }
         @endphp
-        <div class="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
-            <div class="flex justify-between items-start gap-2">
-                <div>
-                    <h1 class="text-base font-bold text-slate-900">{{ $service->customer->name ?? 'Direct Customer' }}</h1>
-                    <div class="text-xs text-sky-700 font-medium mt-0.5">{{ $service->asset->custom_name ?? $service->asset->product->name ?? 'Equipment / Machine' }}</div>
+        <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 shadow-sm space-y-3">
+            <div class="flex justify-between items-start gap-2.5">
+                <div class="min-w-0 flex-1">
+                    <h1 class="text-base font-bold text-slate-900 break-words">{{ $service->customer->name ?? 'Direct Customer' }}</h1>
+                    <div class="text-xs text-sky-700 font-medium mt-0.5 break-words">{{ $service->asset->custom_name ?? $service->asset->product->name ?? 'Equipment / Machine' }}</div>
                     <div class="text-[11px] text-slate-400 font-mono">S/N: {{ $service->asset->serial_number ?? 'N/A' }}</div>
                 </div>
                 <a href="{{ route('tech_portal.navigation', $service->id) }}" target="_blank" onclick="openGoogleMapsNavigation('{{ $service->id }}', event)"
-                   class="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 flex items-center gap-1.5 text-xs font-semibold transition" title="Open Google Maps">
+                   class="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 flex items-center gap-1.5 text-xs font-semibold transition shrink-0" title="Open Google Maps">
                     <i data-lucide="navigation" class="w-3.5 h-3.5"></i>
                     <span>Navigate</span>
                 </a>
             </div>
 
             @if($service->customer && $service->customer->phone)
-                <div class="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
-                    <span class="text-slate-500">Phone: {{ $service->customer->phone }}</span>
-                    <a href="tel:{{ $service->customer->phone }}" class="text-sky-600 font-bold flex items-center gap-1 hover:text-sky-700">
-                        <i data-lucide="phone" class="w-3.5 h-3.5"></i> Call Customer
+                <div class="pt-2 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2 text-xs">
+                    <span class="text-slate-500 font-medium">Phone: <a href="tel:{{ $service->customer->phone }}" class="text-slate-800 font-mono font-bold hover:underline">{{ $service->customer->phone }}</a></span>
+                    <a href="tel:{{ $service->customer->phone }}" class="text-sky-600 font-bold flex items-center gap-1 hover:text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100 shrink-0">
+                        <i data-lucide="phone" class="w-3.5 h-3.5"></i> <span>Call Customer</span>
                     </a>
                 </div>
             @endif
 
             @if($addrStr)
-                <div class="text-xs text-slate-600 pt-1 border-t border-slate-100 flex items-start gap-1.5">
+                <div class="text-xs text-slate-600 pt-1 border-t border-slate-100 flex items-start gap-1.5 break-words">
                     <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5"></i>
-                    <span>{{ $addrStr }}</span>
+                    <span class="break-words leading-relaxed min-w-0 flex-1">{{ $addrStr }}</span>
                 </div>
             @endif
         </div>
 
-        <!-- Google Maps Navigation Action Banner -->
-        <div class="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+        <!-- Google Maps Navigation Action Banner (Mobile-Optimized) -->
+        <div class="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div class="flex items-start gap-3 min-w-0 flex-1">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
                     <i data-lucide="navigation" class="w-5 h-5"></i>
                 </div>
-                <div>
+                <div class="min-w-0 flex-1">
                     <h3 class="text-sm font-bold text-slate-900 leading-tight">Customer Location</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">{{ $addrStr ?: 'Customer registered address' }}</p>
+                    <p class="text-xs text-slate-600 mt-1 break-words leading-relaxed">{{ $addrStr ?: 'Customer registered address' }}</p>
                 </div>
             </div>
             <a href="{{ route('tech_portal.navigation', $service->id) }}" target="_blank" onclick="openGoogleMapsNavigation('{{ $service->id }}', event)"
-               class="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition shrink-0">
+               class="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition shrink-0 cursor-pointer">
                 <i data-lucide="navigation" class="w-4 h-4"></i>
                 <span>Navigate in Google Maps</span>
             </a>
@@ -98,16 +103,16 @@
 
         @if($service->status === 'ON_HOLD')
             <!-- On Hold Alert Banner -->
-            <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
+            <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
                     <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
                         <i data-lucide="pause-circle" class="w-5 h-5"></i>
                     </div>
-                    <div>
+                    <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded font-mono">Job Currently On Hold</span>
                         </div>
-                        <p class="text-xs text-amber-900 mt-1">
+                        <p class="text-xs text-amber-900 mt-1 break-words">
                             @if($service->internal_notes)
                                 {{ \Illuminate\Support\Str::limit($service->internal_notes, 120) }}
                             @else
@@ -116,19 +121,19 @@
                         </p>
                     </div>
                 </div>
-                <button type="button" onclick="resumeService()" class="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition shrink-0 cursor-pointer">
+                <button type="button" onclick="resumeService()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition shrink-0 cursor-pointer">
                     <i data-lucide="play-circle" class="w-4 h-4"></i>
                     <span>Resume Job (In Progress)</span>
                 </button>
             </div>
         @else
             <!-- Keep on Hold Action Strip -->
-            <div class="flex items-center justify-between gap-2 bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs">
-                <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <i data-lucide="info" class="w-4 h-4 text-slate-400"></i>
-                    <span>Need to pause this service visit?</span>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-3.5 shadow-2xs">
+                <div class="flex items-center gap-2 text-xs text-slate-500 min-w-0">
+                    <i data-lucide="info" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                    <span class="break-words">Need to pause this service visit?</span>
                 </div>
-                <button type="button" onclick="openHoldModal()" class="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+                <button type="button" onclick="openHoldModal()" class="w-full sm:w-auto justify-center px-3.5 py-1.5 rounded-xl bg-slate-50 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0">
                     <i data-lucide="pause-circle" class="w-3.5 h-3.5 text-amber-600"></i>
                     <span>Keep Job on Hold</span>
                 </button>
@@ -139,26 +144,8 @@
         <form id="formCompleteTechJob" action="{{ route('tech_portal.complete', $service->id) }}" method="POST" class="space-y-4">
             @csrf
 
-            <!-- 1. Water Quality Measurements -->
-            <div class="bg-white border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-sm">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                    <i data-lucide="droplet" class="w-4 h-4 text-sky-600"></i>
-                    <span>TDS &amp; Water Quality Check</span>
-                </h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Inlet Raw Water TDS (PPM)</label>
-                        <input type="number" name="inlet_tds" value="650" placeholder="e.g. 650" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Pure Outlet TDS (PPM)</label>
-                        <input type="number" name="outlet_tds" value="75" placeholder="e.g. 75" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-emerald-600 font-bold font-mono focus:outline-none focus:bg-white focus:border-sky-500">
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. Technical Observations & Action Taken -->
-            <div class="bg-white border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-sm">
+            <!-- 1. Technical Observations & Action Taken -->
+            <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-sm">
                 <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                     <i data-lucide="clipboard-check" class="w-4 h-4 text-sky-600"></i>
                     <span>Diagnosis &amp; Work Performed</span>
@@ -166,51 +153,75 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Diagnosis / Root Cause <span class="text-rose-500">*</span></label>
-                    <textarea name="diagnosis" rows="2" required placeholder="Observations on pump pressure, filter clogging, leakages..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500">Normal periodic maintenance check completed. Sediment filter replaced.</textarea>
+                    <textarea name="diagnosis" rows="2" required placeholder="Observations on pump pressure, filter clogging, leakages..." class="w-full max-w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500 box-border">Normal periodic maintenance check completed. Sediment filter replaced.</textarea>
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Work Performed / Corrective Action <span class="text-rose-500">*</span></label>
-                    <textarea name="work_performed" rows="2" required placeholder="Specific service steps executed..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500">Cleaned housing, serviced internal components, inspected unit and verified output flow rate.</textarea>
+                    <textarea name="work_performed" rows="2" required placeholder="Specific service steps executed..." class="w-full max-w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-sky-500 box-border">Cleaned housing, serviced internal components, inspected unit and verified output flow rate.</textarea>
                 </div>
             </div>
 
             <!-- 3. Spare Parts Replaced -->
-            <div class="bg-white border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-sm">
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                    <i data-lucide="layers" class="w-4 h-4 text-sky-600"></i>
-                    <span>Parts Replaced On-Site</span>
-                </h3>
-
-                <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    @forelse($spares as $sp)
-                        <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 cursor-pointer hover:border-sky-300 transition">
-                            <div class="flex items-center gap-2.5">
-                                <input type="checkbox" name="parts_replaced[]" value="{{ $sp->name }}" class="w-4 h-4 rounded text-sky-600 border-slate-300">
-                                <span class="text-xs font-medium text-slate-800">{{ $sp->name }}</span>
-                            </div>
-                            <span class="text-xs font-mono font-semibold text-slate-600">₹{{ number_format($sp->selling_price, 2) }}</span>
-                        </label>
-                    @empty
-                        <div class="text-xs text-slate-400">No catalogue spare parts listed.</div>
-                    @endforelse
+            <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 space-y-3.5 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                        <i data-lucide="layers" class="w-4 h-4 text-sky-600"></i>
+                        <span>Parts Replaced On-Site</span>
+                    </h3>
+                    <button type="button" 
+                            id="btnAddCustomPartBtn" 
+                            onclick="addCustomPartRow()" 
+                            class="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-xl transition shadow-2xs cursor-pointer shrink-0">
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-sky-600"></i>
+                        <span>+ Add New Part</span>
+                    </button>
                 </div>
+
+                <p class="text-[11px] text-slate-500">
+                    Tap <strong>+ Add New Part</strong> to record any spare parts replaced during service with quantity and price.
+                </p>
+
+                <!-- Parts Replaced List -->
+                <div id="customPartsSection" class="space-y-2.5">
+                    <div id="customPartsList" class="space-y-2.5"></div>
+                    <div id="noPartsNotice" class="text-xs text-slate-400 py-3 text-center bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                        No parts added. Tap <strong>+ Add New Part</strong> if any parts were replaced.
+                    </div>
+                </div>
+
+                <!-- Parts Cost Summary Bar -->
+                <div class="p-3 rounded-xl bg-slate-100/90 border border-slate-200 flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="calculator" class="w-4 h-4 text-slate-500 shrink-0"></i>
+                        <span class="text-slate-600 font-medium">
+                            Replaced Parts: <strong id="lblTotalPartsCount" class="font-mono text-slate-900">0</strong>
+                        </span>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span class="text-[10px] text-slate-500 block uppercase">Parts Total</span>
+                        <span id="lblTotalPartsPrice" class="font-mono font-black text-sky-700 text-sm">₹0.00</span>
+                    </div>
+                </div>
+
+                <!-- Container for dynamic hidden inputs to submit structured parts array -->
+                <div id="partsHiddenInputs"></div>
             </div>
 
             <!-- 4. Job Charges -->
-            <div class="bg-white border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-sm">
+            <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-sm">
                 <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                     <i data-lucide="receipt" class="w-4 h-4 text-sky-600"></i>
                     <span>Service Charges</span>
                 </h3>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Labor / Visit Fee (₹)</label>
-                        <input type="number" name="labor_charges" value="350" min="0" step="0.01" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500">
+                        <input type="number" name="labor_charges" placeholder="350" min="0" step="0.01" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Parts Charges (₹)</label>
-                        <input type="number" name="parts_charges" value="0" min="0" step="0.01" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500">
+                        <input type="number" name="parts_charges" placeholder="0.00" min="0" step="0.01" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-mono focus:outline-none focus:bg-white focus:border-sky-500">
                     </div>
                 </div>
             </div>
@@ -306,11 +317,168 @@
             $('#sigDataInput').val('');
         });
 
+        // Initialize Parts Replacement Listeners
+        initPartsReplacementHandlers();
+
+        $('#formCompleteTechJob').on('submit', function() {
+            recalculateParts();
+        });
+
         CRM.handleAjaxForm('#formCompleteTechJob', function(res) {
             CRM.toast(res.message || 'Job completed successfully!', 'success');
             setTimeout(() => window.location.href = res.redirect || "{{ route('tech_portal.dashboard') }}", 500);
         });
     });
+
+    function initPartsReplacementHandlers() {
+        // Catalogue part toggle
+        $(document).on('change', '.part-chk', function() {
+            const $item = $(this).closest('.catalog-part-item');
+            const drawer = $item.find('.part-edit-drawer');
+            if ($(this).is(':checked')) {
+                drawer.removeClass('hidden');
+                $item.addClass('border-sky-300 bg-sky-50/30');
+            } else {
+                drawer.addClass('hidden');
+                $item.removeClass('border-sky-300 bg-sky-50/30');
+            }
+            recalculateParts();
+        });
+
+        // Quantity Stepper (-)
+        $(document).on('click', '.btn-qty-dec', function(e) {
+            e.preventDefault();
+            const input = $(this).siblings('.part-qty-val, .custom-part-qty');
+            let val = parseInt(input.val()) || 1;
+            if (val > 1) {
+                input.val(val - 1);
+                recalculateParts();
+            }
+        });
+
+        // Quantity Stepper (+)
+        $(document).on('click', '.btn-qty-inc', function(e) {
+            e.preventDefault();
+            const input = $(this).siblings('.part-qty-val, .custom-part-qty');
+            let val = parseInt(input.val()) || 1;
+            input.val(val + 1);
+            recalculateParts();
+        });
+
+        // Quantity & Price change
+        $(document).on('input change', '.part-qty-val, .part-price-val, .custom-part-qty, .custom-part-price, .custom-part-name', function() {
+            recalculateParts();
+        });
+
+        // Remove custom part
+        $(document).on('click', '.btn-remove-custom-part', function(e) {
+            e.preventDefault();
+            $(this).closest('.custom-part-card').remove();
+            if ($('#customPartsList .custom-part-card').length === 0) {
+                $('#noPartsNotice').removeClass('hidden');
+            }
+            recalculateParts();
+        });
+    }
+
+    let customPartCounter = 0;
+    function addCustomPartRow() {
+        customPartCounter++;
+        $('#noPartsNotice').addClass('hidden');
+
+        const newRowHtml = `
+            <div class="custom-part-card custom-part-item p-3 rounded-xl bg-sky-50/60 border border-sky-200/90 space-y-2 animate-in fade-in" id="customPartRow_${customPartCounter}">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 text-xs font-bold text-sky-800">
+                        <i data-lucide="wrench" class="w-3.5 h-3.5 text-sky-600"></i>
+                        <span>Part #${customPartCounter}</span>
+                    </div>
+                    <button type="button" class="btn-remove-custom-part text-slate-400 hover:text-rose-600 p-1 transition" title="Remove part">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div>
+                    <input type="text" 
+                           placeholder="Enter part name (e.g. Inline Mineral Cartridge, RO SMPS Adapter 24V...)" 
+                           class="custom-part-name w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-sky-500 shadow-2xs" 
+                           required>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <label class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Quantity</label>
+                        <div class="flex items-center gap-1">
+                            <button type="button" class="btn-qty-dec w-7 h-7 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 font-bold text-slate-700 flex items-center justify-center">-</button>
+                            <input type="number" min="1" value="1" class="custom-part-qty w-12 text-center bg-white border border-slate-300 rounded-lg py-1 text-xs font-mono font-bold">
+                            <button type="button" class="btn-qty-inc w-7 h-7 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 font-bold text-slate-700 flex items-center justify-center">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] uppercase font-bold text-slate-500 block mb-1">Unit Price (₹)</label>
+                        <input type="number" min="0" step="0.01" placeholder="0.00" class="custom-part-price w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-right focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#customPartsList').append(newRowHtml);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        $('#customPartRow_' + customPartCounter).find('.custom-part-name').focus();
+        recalculateParts();
+    }
+
+    function recalculateParts() {
+        let count = 0;
+        let total = 0;
+        const parts = [];
+
+        // 1. Process catalogue items
+        $('.catalog-part-item').each(function() {
+            const $item = $(this);
+            const isChecked = $item.find('.part-chk').is(':checked');
+            if (isChecked) {
+                const name = $item.data('name');
+                const qty = Math.max(1, parseInt($item.find('.part-qty-val').val()) || 1);
+                const price = Math.max(0, parseFloat($item.find('.part-price-val').val()) || 0);
+                const lineTotal = Math.round(qty * price * 100) / 100;
+                count += qty;
+                total += lineTotal;
+                parts.push({ name: name, quantity: qty, price: price, total: lineTotal });
+            }
+        });
+
+        // 2. Process custom items
+        $('.custom-part-card').each(function() {
+            const $item = $(this);
+            const name = $item.find('.custom-part-name').val().trim();
+            const qty = Math.max(1, parseInt($item.find('.custom-part-qty').val()) || 1);
+            const price = Math.max(0, parseFloat($item.find('.custom-part-price').val()) || 0);
+            if (name.length > 0) {
+                const lineTotal = Math.round(qty * price * 100) / 100;
+                count += qty;
+                total += lineTotal;
+                parts.push({ name: name, quantity: qty, price: price, total: lineTotal });
+            }
+        });
+
+        // Update UI summary
+        $('#lblTotalPartsCount').text(count);
+        $('#lblTotalPartsPrice').text('₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+        // Automatically update parts_charges input
+        $('input[name="parts_charges"]').val(total.toFixed(2));
+
+        // Populate hidden inputs
+        const $container = $('#partsHiddenInputs');
+        $container.empty();
+        parts.forEach(function(p, i) {
+            $container.append(`
+                <input type="hidden" name="parts_replaced[${i}][name]" value="${$('<div>').text(p.name).html()}">
+                <input type="hidden" name="parts_replaced[${i}][quantity]" value="${p.quantity}">
+                <input type="hidden" name="parts_replaced[${i}][price]" value="${p.price}">
+                <input type="hidden" name="parts_replaced[${i}][total]" value="${p.total}">
+            `);
+        });
+    }
 
     function openHoldModal() {
         $('#holdReason').val('Awaiting specialized spare part');
@@ -419,9 +587,11 @@
         const srvNumber = destination.serviceNumber || '{{ $service->service_number }}';
         const custName = destination.customerName || '{{ addslashes($service->customer->name ?? "Direct Customer") }}';
         const address = destination.address || '{{ addslashes($addrStr ?? "Customer premise address") }}';
-        const mapsUrl = (destination.latitude && destination.longitude)
-            ? `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}`
-            : (destination.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination.address)}` : `/tech-portal/services/${serviceId}/navigate`);
+        const mapsUrl = destination.address
+            ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination.address)}&travelmode=driving`
+            : ((destination.latitude && destination.longitude)
+                ? `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}&travelmode=driving`
+                : `/tech-portal/services/${serviceId}/navigate`);
 
         $('#activeNavServiceNum').text(srvNumber);
         $('#activeNavCustomerName').text(custName);

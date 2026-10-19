@@ -19,6 +19,7 @@ use Carbon\Carbon;
 
 class SaleController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     /**
      * List all sales orders
      */
@@ -45,7 +46,7 @@ class SaleController extends Controller
 
         $sales = $query->paginate(10)->withQueryString();
 
-        $customers = Customer::where('status', 'ACTIVE')->get();
+        $customers = Customer::where('status', 'ACTIVE')->orderBy('full_name')->get();
         $products = Product::where('is_active', true)->get();
         $catalogProducts = $products->map(function ($p) {
             return [
@@ -66,6 +67,7 @@ class SaleController extends Controller
         ]);
     }
 
+    // ---------------------- 2. View Single / Show Details ---------------------
     /**
      * Show single sales order
      */
@@ -75,6 +77,7 @@ class SaleController extends Controller
         return view('sales.show', ['sale' => $sale]);
     }
 
+    // ---------------------- 3. Insert Action ---------------------
     /**
      * Store new sales order with GST calculation & automatic invoice creation.
      * Supports both catalogue product selection and custom free-text product names.
@@ -264,7 +267,9 @@ class SaleController extends Controller
                 ]);
             }
 
-            return redirect()->route('invoices.show', $invoice->id)->with('success', 'Sale order and tax invoice generated.');
+            return redirect()->route('invoices.show', $invoice->id)
+                ->with('success', 'Sale order and tax invoice generated.')
+                ->with('msgb', 'Sale order and tax invoice generated.');
         });
     }
 }

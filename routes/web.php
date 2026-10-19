@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SearchController;
@@ -24,30 +25,41 @@ use App\Http\Controllers\TechnicianController;
 |--------------------------------------------------------------------------
 | Web Routes - Enterprises CRM (SaaS Architecture)
 |--------------------------------------------------------------------------
+| Standards Compliant: Direct Routing & Architectural Blueprint
 */
 
-// Authentication Routes
+//---------------------- Production Cache Clear Utility -----------------
+Route::get('clear-cache', function () {
+    Artisan::call('config:clear');
+    Artisan::call('cache:clear');
+    Artisan::call('view:clear');
+    Artisan::call('route:clear');
+    return "Cache is cleared";
+});
+
+//---------------------- Admin Authentication -----------------
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/captcha', [AuthController::class, 'getCaptcha'])->name('captcha.get');
 Route::get('/captcha-alt', [AuthController::class, 'getCaptcha'])->name('captcha');
 
-// Technician legacy portal shortcuts
+//---------------------- Technician Legacy Portal Shortcuts -----------------
 Route::get('/technician', fn() => redirect()->route('tech_portal.dashboard'));
 Route::get('/technician/login', fn() => redirect()->route('tech_portal.login'));
 
-// Authenticated CRM Routes
+//---------------------- Authenticated Administrative Console -----------------
 Route::middleware('auth')->group(function () {
+    //---------------------- Dashboard & Overview -----------------
     Route::get('/', [DashboardController::class, 'index'])->name('home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])->name('dashboard.overview');
     Route::get('/inquiries', fn() => redirect()->route('customers.index'))->name('inquiries.index');
 
-    // Global Command Palette Search (Ctrl+K)
+    //---------------------- Global Search (Command Palette) -----------------
     Route::get('/search/global', [SearchController::class, 'globalSearch'])->name('search.global');
 
-    // Customers
+    //---------------------- Manage Customers & Directory -----------------
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     Route::get('/customers/geocode', [CustomerController::class, 'geocodeAddress'])->name('customers.geocode');
@@ -61,12 +73,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{id}/addresses', [CustomerController::class, 'storeAddress'])->name('customers.addresses.store');
     Route::put('/customers/{id}/addresses/{addressId}', [CustomerController::class, 'updateAddress'])->name('customers.addresses.update');
 
-    // Customer Assets
+    //---------------------- Manage Customer Assets -----------------
     Route::get('/customers/{customerId}/assets', [ServiceController::class, 'customerAssets'])->name('customers.assets.list');
     Route::post('/customers/{customerId}/assets', [AssetController::class, 'store'])->name('customers.assets.store');
     Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
 
-    // Invoices
+    //---------------------- Manage Invoices & Billing -----------------
     Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
     Route::get('/invoices/export/csv', [InvoiceController::class, 'exportCsv'])->name('invoices.export');
@@ -75,24 +87,25 @@ Route::middleware('auth')->group(function () {
     Route::post('/invoices/{id}/due-mail', [InvoiceController::class, 'sendDueMail'])->name('invoices.due_mail');
     Route::post('/invoices/{id}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
 
-    // Sales Orders
+    //---------------------- Manage Sales Orders -----------------
     Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
     Route::post('/sales', [SaleController::class, 'store'])->name('sales.store');
     Route::get('/sales/{id}', [SaleController::class, 'show'])->name('sales.show');
 
-    // Payments & Collections
+    //---------------------- Manage Payments & Collections -----------------
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::post('/payments/rentals', [PaymentController::class, 'storeRentalPayment'])->name('payments.rentals.store');
     Route::get('/payments/{id}', [PaymentController::class, 'show'])->name('payments.show');
     Route::post('/payments/{id}/cancel', [PaymentController::class, 'cancel'])->name('payments.cancel');
 
-    // Inventory & Spare Parts
+    //---------------------- Manage Inventory & Spare Parts -----------------
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
     Route::post('/inventory/purchases', [InventoryController::class, 'recordPurchase'])->name('inventory.purchases');
     Route::post('/inventory/sales', [InventoryController::class, 'recordSale'])->name('inventory.sales');
 
-    // Services & Field Operations
+    //---------------------- Manage Services & Field Operations -----------------
     Route::get('/services', [ServiceController::class, 'index'])->name('services.index');
     Route::get('/services/calendar-heatmap', [ServiceController::class, 'calendarHeatmap'])->name('services.calendar_heatmap');
     Route::post('/services', [ServiceController::class, 'store'])->name('services.store');
@@ -100,8 +113,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/services/{id}/assign', [ServiceController::class, 'assignTechnician'])->name('services.assign');
     Route::post('/services/{id}/complete', [ServiceController::class, 'complete'])->name('services.complete');
     Route::post('/services/{id}/status', [ServiceController::class, 'updateStatus'])->name('services.status');
+    Route::delete('/services/{id}', [ServiceController::class, 'destroy'])->name('services.destroy');
+    Route::post('/services/{id}/delete', [ServiceController::class, 'destroy'])->name('services.delete');
+    Route::post('/services/{id}/parts', [ServiceController::class, 'updateParts'])->name('services.parts.update');
 
-    // Technicians & Field Workforce Directory
+    //---------------------- Manage Technicians & Workforce Directory -----------------
     Route::get('/technicians', [TechnicianController::class, 'index'])->name('technicians.index');
     Route::get('/technicians/map', [TechnicianController::class, 'map'])->name('technicians.map');
     Route::post('/technicians', [TechnicianController::class, 'store'])->name('technicians.store');
@@ -113,7 +129,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/technicians/{id}/reset-pin', [TechnicianController::class, 'resetPin'])->name('technicians.reset_pin');
     Route::get('/api/v1/technicians/{id}/360', [TechnicianController::class, 'api360Profile'])->name('technicians.api.360');
 
-    // Live Maps Integration Endpoints (Admin Dispatcher)
+    //---------------------- Live Maps & Dispatcher Telemetry -----------------
     Route::get('/maps/admin/config', [TechnicianController::class, 'mapsConfig'])->name('maps.admin.config');
     Route::get('/maps/admin/live-technicians', [TechnicianController::class, 'liveTechnicians'])->name('maps.admin.live');
     Route::post('/maps/admin/recalculate-route', [TechnicianController::class, 'recalculateRoute'])->name('maps.admin.recalculate');
@@ -123,26 +139,29 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/v1/maps/admin/recalculate-route', [TechnicianController::class, 'recalculateRoute'])->name('api.maps.admin.recalculate');
     Route::get('/api/v1/maps/admin/route-geometry', [TechnicianController::class, 'routeGeometry'])->name('api.maps.admin.route_geometry');
 
-    // Job Cards
+    //---------------------- Manage Digital Job Cards -----------------
     Route::get('/job-cards', [JobCardController::class, 'index'])->name('job_cards.index');
     Route::get('/job-cards/{id}', [JobCardController::class, 'show'])->name('job_cards.show');
 
-    // Warranties & AMC
+    //---------------------- Manage Warranties & AMC Contracts -----------------
     Route::get('/warranties', [WarrantyController::class, 'index'])->name('warranties.index');
     Route::get('/warranties/{id}', [WarrantyController::class, 'show'])->name('warranties.show');
     Route::post('/warranties/{id}/event', [WarrantyController::class, 'recordEvent'])->name('warranties.event');
 
-    // Dues & Follow-up Ledger
+    //---------------------- Manage Customer Dues & Ledgers -----------------
     Route::get('/dues', [DuesController::class, 'index'])->name('dues.index');
 
-    // Rentals
+    //---------------------- Manage Commercial RO Rentals -----------------
     Route::get('/rentals', [RentalController::class, 'index'])->name('rentals.index');
     Route::post('/rentals', [RentalController::class, 'store'])->name('rentals.store');
+    Route::get('/rentals/{id}', [RentalController::class, 'show'])->name('rentals.show');
+    Route::put('/rentals/{id}', [RentalController::class, 'update'])->name('rentals.update');
+    Route::post('/rentals/{id}/return', [RentalController::class, 'returnMachine'])->name('rentals.return');
 
-    // Executive Reports & Analytics
+    //---------------------- Executive Analytics & Reports -----------------
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
-    // System Settings & Audit Logs
+    //---------------------- System Settings & Maintenance -----------------
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/sequences', [SettingController::class, 'updateSequences'])->name('settings.sequences.update');
@@ -150,7 +169,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/clean-data/execute', [SettingController::class, 'executeCleanData'])->name('settings.clean_data.execute');
 });
 
-// Field Technician Mobile Portal Routes
+//---------------------- Field Technician Mobile Portal -----------------
 Route::prefix('tech-portal')->group(function () {
     Route::get('/login', [TechnicianPortalController::class, 'login'])->name('tech_portal.login');
     Route::get('/login-alias', [TechnicianPortalController::class, 'login'])->name('technician.login');
@@ -174,7 +193,7 @@ Route::prefix('tech-portal')->group(function () {
     Route::get('/maps/technician/active', [TechnicianPortalController::class, 'activeTracking']);
 });
 
-// Direct API v1 Routes for Technician Tracking
+//---------------------- Technician Telemetry API v1 -----------------
 Route::prefix('api/v1/maps/technician')->group(function () {
     Route::post('/navigate', [TechnicianPortalController::class, 'startNavigationViaPost'])->name('api.maps.technician.navigate');
     Route::post('/location', [TechnicianPortalController::class, 'updateGps'])->name('api.maps.technician.location');

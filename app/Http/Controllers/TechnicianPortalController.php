@@ -34,15 +34,14 @@ class TechnicianPortalController extends Controller
         return null;
     }
 
+    /* 1. View / Show Portal Login */
     public function login()
     {
         $technicians = Technician::where('status', 'ACTIVE')->get();
         return view('technician_portal.login', compact('technicians'));
     }
 
-    /**
-     * Authenticate field technician using phone and Security PIN
-     */
+    /* 1. Authenticate Technician PIN Action */
     public function authenticate(Request $request)
     {
         $validated = $request->validate([
@@ -99,12 +98,14 @@ class TechnicianPortalController extends Controller
         ]);
     }
 
+    /* 1. De-authenticate Session */
     public function logout()
     {
         session()->forget('technician_id');
         return redirect()->route('tech_portal.login');
     }
 
+    /* 1. View / List Dashboard Tasks */
     public function dashboard(Request $request)
     {
         $technician = $this->getCurrentTechnician();
@@ -113,13 +114,13 @@ class TechnicianPortalController extends Controller
         }
 
         $assignedServices = Service::where('technician_id', $technician->id)
-            ->with(['customer.addresses', 'asset.product', 'jobCard', 'warranty'])
+            ->with(['customer.addresses', 'asset.product', 'asset.installationAddress', 'jobCard', 'warranty'])
             ->whereIn('status', ['ASSIGNED', 'IN_PROGRESS', 'SCHEDULED', 'ON_HOLD'])
             ->orderBy('scheduled_date', 'asc')
             ->get();
 
         $completedServices = Service::where('technician_id', $technician->id)
-            ->with(['customer.addresses', 'asset.product', 'jobCard', 'warranty'])
+            ->with(['customer.addresses', 'asset.product', 'asset.installationAddress', 'jobCard', 'warranty'])
             ->where('status', 'COMPLETED')
             ->orderBy('completed_at', 'desc')
             ->take(20)
@@ -137,7 +138,7 @@ class TechnicianPortalController extends Controller
         $selectedServiceId = $request->query('service_id');
         $activeService = null;
         if ($selectedServiceId) {
-            $activeService = Service::with(['customer.addresses', 'asset.product', 'jobCard', 'warranty'])->find($selectedServiceId);
+            $activeService = Service::with(['customer.addresses', 'asset.product', 'asset.installationAddress', 'jobCard', 'warranty'])->find($selectedServiceId);
         }
         if (!$activeService) {
             $activeService = $assignedServices->where('status', 'IN_PROGRESS')->first() ?? $assignedServices->first();
@@ -160,10 +161,11 @@ class TechnicianPortalController extends Controller
         ));
     }
 
+    /* 2. View Single / Show Details */
     public function serviceDetail($id)
     {
         $technician = $this->getCurrentTechnician();
-        $service = Service::with(['customer.addresses', 'asset.product', 'jobCard', 'warranty'])
+        $service = Service::with(['customer.addresses', 'asset.product', 'asset.installationAddress', 'jobCard', 'warranty'])
             ->findOrFail($id);
 
         $spares = InventoryItem::where('status', 'ACTIVE')->orderBy('name')->get();
@@ -171,6 +173,7 @@ class TechnicianPortalController extends Controller
         return view('technician_portal.service_detail', compact('technician', 'service', 'spares'));
     }
 
+    /* 4. Update Action: Service Status */
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -209,6 +212,7 @@ class TechnicianPortalController extends Controller
         ]);
     }
 
+    /* 4. Update Action: Complete Service */
     public function completeService(Request $request, $id)
     {
         if (!$request->has('diagnosis')) {
@@ -223,7 +227,7 @@ class TechnicianPortalController extends Controller
             'work_performed' => 'required|string',
             'inlet_tds' => 'nullable|numeric',
             'outlet_tds' => 'nullable|numeric',
-            'parts_replaced' => 'nullable|array',
+            'parts_replaced' => 'nullable',
             'labor_charges' => 'nullable|numeric|min:0',
             'parts_charges' => 'nullable|numeric|min:0',
             'technician_notes' => 'nullable|string',
@@ -231,11 +235,54 @@ class TechnicianPortalController extends Controller
             'signature_data' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($validated, $id) {
+        return DB::transaction(function () use ($validated, $request, $id) {
             $service = Service::with(['jobCard', 'asset'])->findOrFail($id);
 
+            // Normalize parts replaced
+            $partsReplaced = null;
+            $calculatedPartsTotal = 0.0;
+            $rawParts = $request->input('parts_replaced');
+            if (is_string($rawParts)) {
+                $decoded = json_decode($rawParts, true);
+                $rawParts = is_array($decoded) ? $decoded : [['name' => $rawParts, 'quantity' => 1, 'price' => 0]];
+            }
+
+            if (!empty($rawParts) && is_array($rawParts)) {
+                $normalized = [];
+                foreach ($rawParts as $item) {
+                    if (is_string($item)) {
+                        $name = trim($item);
+                        if ($name !== '') {
+                            $normalized[] = [
+                                'name' => $name,
+                                'quantity' => 1,
+                                'price' => 0.00,
+                                'total' => 0.00,
+                            ];
+                        }
+                    } elseif (is_array($item)) {
+                        $name = trim($item['name'] ?? $item['item_name'] ?? '');
+                        if ($name !== '') {
+                            $qty = max(1, (int)($item['quantity'] ?? $item['qty'] ?? 1));
+                            $price = max(0, (float)($item['price'] ?? $item['unit_price'] ?? 0));
+                            $lineTotal = round($qty * $price, 2);
+                            $calculatedPartsTotal += $lineTotal;
+                            $normalized[] = [
+                                'name' => $name,
+                                'quantity' => $qty,
+                                'price' => $price,
+                                'total' => $lineTotal,
+                            ];
+                        }
+                    }
+                }
+                $partsReplaced = !empty($normalized) ? $normalized : null;
+            }
+
             $labor = (float)($validated['labor_charges'] ?? 0);
-            $parts = (float)($validated['parts_charges'] ?? 0);
+            $parts = ($request->has('parts_charges') && $request->parts_charges !== null && $request->parts_charges !== '')
+                ? (float)$request->parts_charges
+                : $calculatedPartsTotal;
             $total = $labor + $parts;
 
             $service->update([
@@ -247,7 +294,7 @@ class TechnicianPortalController extends Controller
                 $service->jobCard->update([
                     'diagnosis' => $validated['diagnosis'] . (!empty($validated['inlet_tds']) ? " [Inlet TDS: {$validated['inlet_tds']}, Outlet TDS: {$validated['outlet_tds']}]" : ''),
                     'work_performed' => $validated['work_performed'],
-                    'parts_replaced' => !empty($validated['parts_replaced']) ? json_encode($validated['parts_replaced']) : null,
+                    'parts_replaced' => $partsReplaced,
                     'labor_charges' => $labor,
                     'parts_charges' => $parts,
                     'total_charges' => $total,
@@ -273,9 +320,7 @@ class TechnicianPortalController extends Controller
         });
     }
 
-    /**
-     * Mobile Turn-by-Turn GPS Navigation Screen for Field Technician
-     */
+    /* 6. GPS Route Telemetry: Navigation Screen */
     public function navigationScreen($id, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
@@ -283,7 +328,7 @@ class TechnicianPortalController extends Controller
             return redirect()->route('tech_portal.login');
         }
 
-        $service = Service::with(['customer.addresses', 'asset.product', 'jobCard'])->findOrFail($id);
+        $service = Service::with(['customer.addresses', 'asset.product', 'asset.installationAddress', 'jobCard'])->findOrFail($id);
 
         // If live coordinates provided in request, update technician's current position immediately
         if (request()->filled('lat') && request()->filled('lng')) {
@@ -313,13 +358,34 @@ class TechnicianPortalController extends Controller
             ]);
         }
 
-        // Fetch customer coordinates and address
-        $address = $service->customer ? ($service->customer->primaryAddress ?? $service->customer->addresses->first()) : null;
+        // Fetch customer coordinates and address (prioritize customer registered address; fallback to matching asset installation address)
+        $address = null;
+        if ($service->customer && $service->customer->addresses && $service->customer->addresses->isNotEmpty()) {
+            $address = $service->customer->addresses->firstWhere('is_default', true) ?? $service->customer->addresses->first();
+        } elseif ($service->asset && $service->asset->installationAddress && (!$service->customer_id || $service->asset->customer_id === $service->customer_id)) {
+            $address = $service->asset->installationAddress;
+        }
+
         $destLat = ($address && $address->latitude !== null && (float) $address->latitude != 0.0 && (float) $address->latitude >= -90 && (float) $address->latitude <= 90) ? (float) $address->latitude : null;
         $destLng = ($address && $address->longitude !== null && (float) $address->longitude != 0.0 && (float) $address->longitude >= -180 && (float) $address->longitude <= 180) ? (float) $address->longitude : null;
-        $destAddress = ($address && !empty(trim($address->full_address)))
-            ? trim($address->full_address)
-            : null;
+        
+        $destAddress = null;
+        if ($address) {
+            $full = trim($address->full_address ?? '');
+            if (!empty($full)) {
+                $destAddress = $full;
+            } else {
+                $parts = array_filter([
+                    $address->address_line1,
+                    $address->address_line2,
+                    $address->landmark ? "Near {$address->landmark}" : null,
+                    $address->city,
+                    $address->state,
+                    $address->postal_code,
+                ]);
+                $destAddress = !empty($parts) ? implode(', ', $parts) : null;
+            }
+        }
 
         $hasCoords = ($destLat !== null && $destLng !== null);
         $hasAddress = !empty($destAddress);
@@ -330,16 +396,19 @@ class TechnicianPortalController extends Controller
                     'success' => false,
                     'error' => [
                         'code' => 'CUSTOMER_COORDINATES_MISSING',
-                        'message' => 'Customer premise destination coordinates and address are not configured. Please set the customer location pin in Customer Details.',
+                        'message' => 'Customer premise destination coordinates and address are not configured. Please set the customer location pin or address in Customer Details.',
                     ],
                 ], 400);
             }
-            return redirect()->back()->with('error', 'Customer premise destination coordinates and address are not configured.');
+            return redirect()->back()
+                ->with('error', 'Customer premise destination coordinates and address are not configured.')
+                ->with('failmsg', 'Customer premise destination coordinates and address are not configured.');
         }
 
-        $googleMapsUrl = $hasCoords
-            ? "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}&travelmode=driving"
-            : "https://www.google.com/maps/dir/?api=1&destination=" . urlencode($destAddress) . "&travelmode=driving";
+        // Always prioritize the customer's actual address so Google Maps navigates directly to their address
+        $googleMapsUrl = $hasAddress
+            ? "https://www.google.com/maps/dir/?api=1&destination=" . urlencode($destAddress) . "&travelmode=driving"
+            : "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}&travelmode=driving";
 
         if ($hasCoords || $hasAddress) {
             $mapsTrackingService->setActiveDestination((string) $tech->id, [
@@ -369,9 +438,7 @@ class TechnicianPortalController extends Controller
         return redirect()->away($googleMapsUrl);
     }
 
-    /**
-     * Start active navigation for a service
-     */
+    /* 6. GPS Route Telemetry: Start Navigation */
     public function startNavigation(Request $request, $serviceId, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
@@ -385,7 +452,7 @@ class TechnicianPortalController extends Controller
             ], 401);
         }
 
-        $service = Service::with(['customer.addresses', 'jobCard'])->findOrFail($serviceId);
+        $service = Service::with(['customer.addresses', 'asset.product', 'asset.installationAddress', 'jobCard'])->findOrFail($serviceId);
 
         // Authorization check: service must be assigned to this technician
         if ($service->technician_id !== $tech->id && (!auth()->check() || !auth()->user()->hasRole('ADMIN'))) {
@@ -398,12 +465,34 @@ class TechnicianPortalController extends Controller
             ], 403);
         }
 
-        $address = $service->customer ? ($service->customer->primaryAddress ?? $service->customer->addresses->first()) : null;
+        // Fetch customer coordinates and address (prioritize customer registered address; fallback to matching asset installation address)
+        $address = null;
+        if ($service->customer && $service->customer->addresses && $service->customer->addresses->isNotEmpty()) {
+            $address = $service->customer->addresses->firstWhere('is_default', true) ?? $service->customer->addresses->first();
+        } elseif ($service->asset && $service->asset->installationAddress && (!$service->customer_id || $service->asset->customer_id === $service->customer_id)) {
+            $address = $service->asset->installationAddress;
+        }
+
         $destLat = ($address && $address->latitude !== null && (float) $address->latitude != 0.0 && (float) $address->latitude >= -90 && (float) $address->latitude <= 90) ? (float) $address->latitude : null;
         $destLng = ($address && $address->longitude !== null && (float) $address->longitude != 0.0 && (float) $address->longitude >= -180 && (float) $address->longitude <= 180) ? (float) $address->longitude : null;
-        $destAddress = ($address && !empty(trim($address->full_address)))
-            ? trim($address->full_address)
-            : null;
+        
+        $destAddress = null;
+        if ($address) {
+            $full = trim($address->full_address ?? '');
+            if (!empty($full)) {
+                $destAddress = $full;
+            } else {
+                $parts = array_filter([
+                    $address->address_line1,
+                    $address->address_line2,
+                    $address->landmark ? "Near {$address->landmark}" : null,
+                    $address->city,
+                    $address->state,
+                    $address->postal_code,
+                ]);
+                $destAddress = !empty($parts) ? implode(', ', $parts) : null;
+            }
+        }
 
         $hasCoords = ($destLat !== null && $destLng !== null);
         $hasAddress = !empty($destAddress);
@@ -413,7 +502,7 @@ class TechnicianPortalController extends Controller
                 'success' => false,
                 'error' => [
                     'code' => 'CUSTOMER_COORDINATES_MISSING',
-                    'message' => 'Customer premise destination coordinates and address are not configured. Please set the customer location pin in Customer Details before starting navigation.',
+                    'message' => 'Customer premise destination coordinates and address are not configured. Please set the customer location pin or address in Customer Details before starting navigation.',
                 ],
             ], 400);
         }
@@ -450,9 +539,10 @@ class TechnicianPortalController extends Controller
             'scheduledTimeSlot' => $service->scheduled_time_slot,
         ]);
 
-        $googleMapsUrl = $hasCoords
-            ? "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}&travelmode=driving"
-            : "https://www.google.com/maps/dir/?api=1&destination=" . urlencode($destAddress) . "&travelmode=driving";
+        // Always prioritize the customer's actual address so Google Maps navigates directly to their address
+        $googleMapsUrl = $hasAddress
+            ? "https://www.google.com/maps/dir/?api=1&destination=" . urlencode($destAddress) . "&travelmode=driving"
+            : "https://www.google.com/maps/dir/?api=1&destination={$destLat},{$destLng}&travelmode=driving";
 
         return response()->json([
             'success' => true,
@@ -469,9 +559,7 @@ class TechnicianPortalController extends Controller
         ]);
     }
 
-    /**
-     * Start active navigation via POST body (API compatible)
-     */
+    /* 6. GPS Route Telemetry: Start Navigation via POST */
     public function startNavigationViaPost(Request $request, MapsTrackingService $mapsTrackingService)
     {
         $serviceId = $request->input('serviceId') ?? $request->input('service_id');
@@ -488,9 +576,7 @@ class TechnicianPortalController extends Controller
         return $this->startNavigation($request, $serviceId, $mapsTrackingService);
     }
 
-    /**
-     * Save authoritative coordinates resolved by Google Maps client for the customer premise
-     */
+    /* 6. GPS Route Telemetry: Save Destination Pin */
     public function saveDestinationCoordinates(Request $request, $serviceId, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
@@ -528,9 +614,7 @@ class TechnicianPortalController extends Controller
         return response()->json(['success' => false, 'error' => 'INVALID_COORDINATES'], 422);
     }
 
-    /**
-     * Stop active navigation / Check in as arrived
-     */
+    /* 6. GPS Route Telemetry: Stop Navigation */
     public function stopNavigation(Request $request, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
@@ -549,9 +633,7 @@ class TechnicianPortalController extends Controller
         ]);
     }
 
-    /**
-     * Real-time GPS Location Ping from Technician Device
-     */
+    /* 6. GPS Route Telemetry: Update GPS Location Ping */
     public function updateGps(Request $request, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
@@ -609,9 +691,7 @@ class TechnicianPortalController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/v1/maps/technician/active
-     */
+    /* 6. GPS Route Telemetry: Active Tracking Poll */
     public function activeTracking(Request $request, MapsTrackingService $mapsTrackingService)
     {
         $tech = $this->getCurrentTechnician();
@@ -633,17 +713,13 @@ class TechnicianPortalController extends Controller
         ]);
     }
 
-    /**
-     * Legacy API Compatibility: POST /maps/technician/navigate
-     */
+    /* 6. GPS Route Telemetry: Legacy API Start Navigate */
     public function apiStartNavigate(Request $request, MapsTrackingService $mapsTrackingService)
     {
         return $this->startNavigationViaPost($request, $mapsTrackingService);
     }
 
-    /**
-     * Legacy API Compatibility: POST /maps/technician/location
-     */
+    /* 6. GPS Route Telemetry: Legacy API Location Ping */
     public function apiLocationPing(Request $request, MapsTrackingService $mapsTrackingService)
     {
         return $this->updateGps($request, $mapsTrackingService);

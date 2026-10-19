@@ -85,12 +85,10 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-display font-extrabold tracking-wider text-white uppercase">ENTERPRISES</span>
-                        <span class="text-[9px] font-bold text-sky-400 tracking-widest uppercase font-mono">CRM</span>
                     </div>
                     <div class="flex items-center gap-1.5 mt-0.5">
                         <span class="text-xs font-bold text-slate-200">{{ $technician->full_name }}</span>
-                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span class="text-[10px] text-emerald-400 font-semibold" id="topGpsStatus">On Duty</span>
+                        <span id="topGpsStatus" class="hidden"></span>
                     </div>
                 </div>
             </div>
@@ -114,29 +112,29 @@
         <!-- ========================================== -->
         <section id="tabPane-assigned" class="tab-pane space-y-5">
             <!-- Key Metric Cards -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Visits</span>
-                    <div class="text-2xl font-bold font-mono text-slate-900 mt-1">{{ $assignedServices->count() }}</div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">Assigned visits</div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div class="bg-white border border-slate-200/90 rounded-xl p-2.5 sm:p-3 shadow-2xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pending Visits</span>
+                    <div class="text-lg sm:text-xl font-bold font-mono text-slate-900 mt-0.5">{{ $assignedServices->count() }}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Assigned visits</div>
                 </div>
 
-                <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">In Progress</span>
-                    <div class="text-2xl font-bold font-mono text-amber-600 mt-1">{{ $assignedServices->where('status', 'IN_PROGRESS')->count() }}</div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">Under execution</div>
+                <div class="bg-white border border-slate-200/90 rounded-xl p-2.5 sm:p-3 shadow-2xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">In Progress</span>
+                    <div class="text-lg sm:text-xl font-bold font-mono text-amber-600 mt-0.5">{{ $assignedServices->where('status', 'IN_PROGRESS')->count() }}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Under execution</div>
                 </div>
 
-                <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Today</span>
-                    <div class="text-2xl font-bold font-mono text-emerald-600 mt-1">{{ $completedToday }}</div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">Closed visits</div>
+                <div class="bg-white border border-slate-200/90 rounded-xl p-2.5 sm:p-3 shadow-2xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Completed Today</span>
+                    <div class="text-lg sm:text-xl font-bold font-mono text-emerald-600 mt-0.5">{{ $completedToday }}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Closed visits</div>
                 </div>
 
-                <div class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">On Hold</span>
-                    <div class="text-2xl font-bold font-mono text-amber-600 mt-1">{{ $assignedServices->where('status', 'ON_HOLD')->count() }}</div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">Paused tickets</div>
+                <div class="bg-white border border-slate-200/90 rounded-xl p-2.5 sm:p-3 shadow-2xs">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">On Hold</span>
+                    <div class="text-lg sm:text-xl font-bold font-mono text-amber-600 mt-0.5">{{ $assignedServices->where('status', 'ON_HOLD')->count() }}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Paused tickets</div>
                 </div>
             </div>
 
@@ -165,8 +163,13 @@
                         $addrStr = '';
                         $lat = null;
                         $lng = null;
-                        if ($srv->customer && $srv->customer->addresses->isNotEmpty()) {
-                            $addr = $srv->customer->addresses->first();
+                        $addr = null;
+                        if ($srv->customer && $srv->customer->addresses && $srv->customer->addresses->isNotEmpty()) {
+                            $addr = $srv->customer->addresses->firstWhere('is_default', true) ?? $srv->customer->addresses->first();
+                        } elseif ($srv->asset && $srv->asset->installationAddress && (!$srv->customer_id || $srv->asset->customer_id === $srv->customer_id)) {
+                            $addr = $srv->asset->installationAddress;
+                        }
+                        if ($addr) {
                             $addrStr = $addr->full_address ?: "{$addr->address_line1}, {$addr->city} {$addr->postal_code}";
                             $lat = $addr->latitude !== null ? (float)$addr->latitude : null;
                             $lng = $addr->longitude !== null ? (float)$addr->longitude : null;
@@ -174,7 +177,7 @@
                     @endphp
                     <div class="task-card bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm space-y-4 hover:border-sky-300 transition" data-status="{{ $srv->status }}">
                         <div class="flex items-start justify-between gap-3">
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
                                     <span class="text-xs font-mono font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-100">
                                         {{ $srv->service_number }}
@@ -183,12 +186,12 @@
                                         {{ \Carbon\Carbon::parse($srv->scheduled_date)->format('d M, h:i A') }}
                                     </span>
                                 </div>
-                                <h3 class="text-base font-bold text-slate-900 mt-1.5">{{ $srv->customer->name ?? 'Direct Customer' }}</h3>
-                                <p class="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
-                                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-400"></i>
-                                    <span>{{ $srv->asset->custom_name ?? $srv->asset->product->name ?? 'Equipment / Unit' }}</span>
+                                <h3 class="text-base font-bold text-slate-900 mt-1.5 break-words">{{ $srv->customer->name ?? 'Direct Customer' }}</h3>
+                                <p class="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5 break-words">
+                                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                                    <span class="break-words">{{ $srv->asset->custom_name ?? $srv->asset->product->name ?? 'Equipment / Unit' }}</span>
                                     @if(!empty($srv->asset->serial_number))
-                                        <span class="font-mono text-[10px] text-slate-400">({{ $srv->asset->serial_number }})</span>
+                                        <span class="font-mono text-[10px] text-slate-400 shrink-0">({{ $srv->asset->serial_number }})</span>
                                     @endif
                                 </p>
                             </div>
@@ -212,7 +215,7 @@
                         <!-- Customer Address & Contact Info -->
                         <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/70 space-y-2 text-xs text-slate-700">
                             @if($srv->customer && $srv->customer->phone)
-                                <div class="flex items-center justify-between">
+                                <div class="flex flex-wrap items-center justify-between gap-1">
                                     <span class="text-slate-500 font-medium flex items-center gap-1.5">
                                         <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
                                         <span>Customer Contact</span>
@@ -230,7 +233,7 @@
 
                             <div class="flex items-start gap-2 pt-1 border-t border-slate-200/60">
                                 <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5"></i>
-                                <span class="leading-relaxed">{{ $addrStr ?: 'Customer Address Pending' }}</span>
+                                <span class="leading-relaxed break-words min-w-0 flex-1">{{ $addrStr ?: 'Customer Address Pending' }}</span>
                             </div>
                         </div>
 
@@ -419,9 +422,6 @@
 
                 <!-- Sign Out -->
                 <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3 justify-end">
-                    <a href="{{ route('dashboard') }}" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs text-center transition">
-                        Open Full Desktop CRM
-                    </a>
                     <a href="{{ route('tech_portal.logout') }}" class="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs text-center transition">
                         End Field Session &amp; Logout
                     </a>
@@ -430,6 +430,10 @@
         </section>
 
     </main>
+
+    <footer class="py-4 text-center text-[11px] text-slate-400 font-mono print:hidden">
+        <span>Enterprises CRM &bull; Field Technician Portal v{{ config('app.version', '1.0.0') }}</span>
+    </footer>
 
     <!-- ========================================== -->
     <!-- MODAL: KEEP JOB ON HOLD                    -->
@@ -672,10 +676,11 @@
         // Update HUD
         const srvNumber = destination.serviceNumber || 'SRV-' + serviceId;
         const custName = destination.customerName || 'Customer Destination';
-        const address = destination.address || 'Customer premise address';
-        const mapsUrl = (destination.latitude && destination.longitude)
-            ? `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}`
-            : (destination.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination.address)}` : `/tech-portal/services/${serviceId}/navigate`);
+        const mapsUrl = destination.address
+            ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination.address)}&travelmode=driving`
+            : ((destination.latitude && destination.longitude)
+                ? `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}&travelmode=driving`
+                : `/tech-portal/services/${serviceId}/navigate`);
 
         $('#activeNavServiceNum').text(srvNumber);
         $('#activeNavCustomerName').text(custName);

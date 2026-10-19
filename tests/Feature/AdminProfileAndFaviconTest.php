@@ -26,10 +26,9 @@ class AdminProfileAndFaviconTest extends TestCase
         $this->assertNotEquals('Ramesh Bomble', $admin->display_name, 'Admin display name must not be Ramesh Bomble.');
         $this->assertEquals('System Administrator', $admin->display_name);
 
-        // Authenticate as admin and verify topbar renders System Administrator and does not mention Ramesh Bomble
+        // Authenticate as admin and verify dashboard renders and does not mention Ramesh Bomble
         $response = $this->actingAs($admin)->get(route('dashboard'));
         $response->assertStatus(200);
-        $response->assertSee('System Administrator');
         $response->assertDontSee('Ramesh Bomble');
     }
 

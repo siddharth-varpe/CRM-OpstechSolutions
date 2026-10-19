@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 
 class InventoryController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     public function index(Request $request)
     {
         $tab = $request->get('tab', 'items'); // items, purchases, sales
@@ -77,6 +78,7 @@ class InventoryController extends Controller
         ));
     }
 
+    // ---------------------- 2. Insert Action (New Item) ---------------------
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -123,9 +125,12 @@ class InventoryController extends Controller
             ]);
         }
 
-        return redirect()->back()->with('success', "Item '{$item->name}' added to inventory.");
+        return redirect()->back()
+            ->with('success', "Item '{$item->name}' added to inventory.")
+            ->with('msgb', "Item '{$item->name}' added to inventory.");
     }
 
+    // ---------------------- 3. Record Purchase Action ---------------------
     public function recordPurchase(Request $request)
     {
         $validated = $request->validate([
@@ -180,10 +185,13 @@ class InventoryController extends Controller
                 ]);
             }
 
-            return redirect()->back()->with('success', "Stock purchase recorded successfully.");
+            return redirect()->back()
+                ->with('success', "Stock purchase recorded successfully.")
+                ->with('msgb', "Stock purchase recorded successfully.");
         });
     }
 
+    // ---------------------- 4. Record Sale / Dispatch Action ---------------------
     public function recordSale(Request $request)
     {
         $validated = $request->validate([
@@ -260,7 +268,9 @@ class InventoryController extends Controller
                 ]);
             }
 
-            return redirect()->back()->with('success', "Stock dispatch recorded successfully.");
+            return redirect()->back()
+                ->with('success', "Stock dispatch recorded successfully.")
+                ->with('msgb', "Stock dispatch recorded successfully.");
         });
     }
 }

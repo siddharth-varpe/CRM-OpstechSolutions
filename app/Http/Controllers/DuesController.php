@@ -10,17 +10,18 @@ use Illuminate\Http\Request;
 
 class DuesController extends Controller
 {
+    /* 1. View / List Details */
     public function index(Request $request)
     {
-        $tab = $request->get('tab', 'services'); // services, payments, calendar
+        $tab = (string) $request->get('tab', 'services'); // services, payments, calendar
+        $search = $request->filled('search') ? trim((string) $request->input('search')) : null;
 
         // 1. Service Dues (Upcoming & Overdue periodic maintenance schedules)
         $serviceDuesQuery = ServiceSchedule::with(['customer', 'asset.product', 'warranty'])
             ->whereIn('status', ['PENDING', 'OVERDUE'])
             ->orderBy('planned_date', 'asc');
 
-        if ($request->filled('search')) {
-            $search = trim($request->search);
+        if (!empty($search)) {
             $serviceDuesQuery->whereHas('customer', function ($cq) use ($search) {
                 $cq->where('full_name', 'like', "%{$search}%")
                    ->orWhere('phone', 'like', "%{$search}%");
@@ -35,8 +36,7 @@ class DuesController extends Controller
             ->where('status', '!=', 'CANCELLED')
             ->orderBy('due_date', 'asc');
 
-        if ($request->filled('search')) {
-            $search = trim($request->search);
+        if (!empty($search)) {
             $paymentDuesQuery->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('serial_number')->nullable();
             $table->string('custom_name')->nullable();
             $table->uuid('installation_address_id')->nullable();
-            $table->timestamp('purchase_date');
+            $table->dateTime('purchase_date');
             $table->integer('initial_warranty_months')->default(12);
             $table->integer('service_interval_months')->default(6);
             $table->string('status')->default('ACTIVE'); // ACTIVE, IN_SERVICE, REPLACED, DECOMMISSIONED
@@ -40,8 +40,8 @@ return new class extends Migration
             $table->uuid('asset_id');
             $table->uuid('sale_id')->nullable();
             $table->string('warranty_type'); // STANDARD_MACHINE, EXTENDED_MACHINE, SPARE_PART
-            $table->timestamp('start_date');
-            $table->timestamp('end_date');
+            $table->dateTime('start_date');
+            $table->dateTime('end_date');
             $table->integer('duration_months');
             $table->string('status')->default('ACTIVE'); // ACTIVE, EXPIRING_SOON, EXPIRED, VOID
             $table->text('terms')->nullable();
@@ -62,7 +62,7 @@ return new class extends Migration
             $table->uuid('customer_id');
             $table->uuid('asset_id');
             $table->string('event_type'); // ACTIVATED, EXTENDED, CLAIM_FILED, REPLACEMENT_APPROVED, REPLACEMENT_COMPLETED, VOIDED, EXPIRED
-            $table->timestamp('event_date');
+            $table->dateTime('event_date');
             $table->uuid('actor_id')->nullable();
             $table->text('reason')->nullable();
             $table->text('notes')->nullable();

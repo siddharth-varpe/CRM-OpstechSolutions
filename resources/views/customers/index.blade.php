@@ -11,7 +11,7 @@
             <h1 class="text-xl sm:text-2xl font-display font-extrabold text-slate-900 tracking-tight">Customer Directory</h1>
             <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Commercial facilities, water treatment plants, and domestic customer profiles.</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('customers.index', array_merge(request()->query(), ['export' => 'csv'])) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-2xs transition-colors">
                 <i data-lucide="download" class="w-4 h-4 text-slate-500"></i>
                 <span>Export CSV</span>

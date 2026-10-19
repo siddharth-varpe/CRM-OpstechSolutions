@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 
 class TechnicianController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     /**
      * Technicians Directory & Workforce Overview
      */
@@ -84,6 +85,7 @@ class TechnicianController extends Controller
         return view('technicians.index', compact('technicians', 'kpis', 'status', 'search', 'viewMode'));
     }
 
+    // ---------------------- 2. Dedicated Live Field Map View ---------------------
     /**
      * Dedicated Live Field Map View
      */
@@ -92,6 +94,8 @@ class TechnicianController extends Controller
         $request->merge(['view' => 'map']);
         return $this->index($request);
     }
+
+    // ---------------------- 3. View Single / 360 Profile Details ---------------------
 
     /**
      * Technician 360° Profile View
@@ -205,13 +209,9 @@ class TechnicianController extends Controller
             }
         }
 
-        // Payments associated with services / customers
-        $customerIds = $assignedServices->pluck('customer_id')->filter()->unique();
-        $payments = \App\Models\Payment::whereHas('invoice', function ($q) use ($customerIds) {
-            $q->whereIn('customer_id', $customerIds);
-        })->with(['customer', 'invoice'])->latest()->take(25)->get();
-
-        $totalCollections = (float) $payments->where('status', 'SUCCESS')->sum('amount');
+        // Collections/payments are managed by admin, not technician
+        $payments = collect([]);
+        $totalCollections = 0.0;
 
         $workSummary = [
             'totalAssigned' => $totalAssigned,
@@ -418,6 +418,7 @@ class TechnicianController extends Controller
         return response()->json($res);
     }
 
+    // ---------------------- 4. Insert Action ---------------------
     /**
      * Store new technician
      */
@@ -435,22 +436,32 @@ class TechnicianController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
+            // Explicit input extraction (Senior Blueprint)
+            $fullName         = $validated['full_name'];
+            $cleanPhone       = preg_replace('/[^0-9]/', '', $validated['phone']);
+            $email            = $validated['email'] ?? null;
+            $address          = $validated['address'] ?? null;
+            $skills           = $validated['skills'] ?? ['Equipment Installation', 'Preventive Maintenance'];
+            $status           = $validated['status'];
+            $emergencyContact = $validated['emergency_contact'] ?? null;
+            $portalPin        = $validated['portal_pin'];
+
             $tech = Technician::create([
-                'full_name' => $validated['full_name'],
-                'phone' => preg_replace('/[^0-9]/', '', $validated['phone']),
-                'email' => $validated['email'] ?? null,
-                'address' => $validated['address'] ?? null,
-                'skills' => $validated['skills'] ?? ['Equipment Installation', 'Preventive Maintenance'],
-                'status' => $validated['status'],
-                'emergency_contact' => $validated['emergency_contact'] ?? null,
-                'tracking_status' => 'IDLE',
+                'full_name'         => $fullName,
+                'phone'             => $cleanPhone,
+                'email'             => $email,
+                'address'           => $address,
+                'skills'            => $skills,
+                'status'            => $status,
+                'emergency_contact' => $emergencyContact,
+                'tracking_status'   => 'IDLE',
             ]);
 
             // Create portal access with admin-assigned PIN
             TechnicianPortalAccess::create([
-                'technician_id' => $tech->id,
+                'technician_id'  => $tech->id,
                 'portal_enabled' => true,
-                'pin_hash' => Hash::make($validated['portal_pin']),
+                'pin_hash'       => Hash::make($portalPin),
             ]);
 
             AuditLog::log('CREATE', 'TECHNICIAN', $tech->id, null, ['name' => $tech->full_name]);
@@ -459,15 +470,17 @@ class TechnicianController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => "Technician {$tech->full_name} created successfully.",
-                    'data' => $tech,
+                    'data'    => $tech,
                 ]);
             }
 
             return redirect()->route('technicians.index')
-                ->with('success', "Technician {$tech->full_name} added to workforce.");
+                ->with('success', "Technician {$tech->full_name} added to workforce.")
+                ->with('msgb', "Technician {$tech->full_name} added to workforce.");
         });
     }
 
+    // ---------------------- 5. Update Action ---------------------
     /**
      * Update technician
      */
@@ -485,14 +498,23 @@ class TechnicianController extends Controller
             'emergency_contact' => 'nullable|string|max:20',
         ]);
 
+        // Explicit input extraction (Senior Blueprint)
+        $fullName         = $validated['full_name'];
+        $cleanPhone       = preg_replace('/[^0-9]/', '', $validated['phone']);
+        $email            = $validated['email'] ?? null;
+        $address          = $validated['address'] ?? null;
+        $skills           = $validated['skills'] ?? $tech->skills;
+        $status           = $validated['status'];
+        $emergencyContact = $validated['emergency_contact'] ?? null;
+
         $tech->update([
-            'full_name' => $validated['full_name'],
-            'phone' => preg_replace('/[^0-9]/', '', $validated['phone']),
-            'email' => $validated['email'] ?? null,
-            'address' => $validated['address'] ?? null,
-            'skills' => $validated['skills'] ?? $tech->skills,
-            'status' => $validated['status'],
-            'emergency_contact' => $validated['emergency_contact'] ?? null,
+            'full_name'         => $fullName,
+            'phone'             => $cleanPhone,
+            'email'             => $email,
+            'address'           => $address,
+            'skills'            => $skills,
+            'status'            => $status,
+            'emergency_contact' => $emergencyContact,
         ]);
 
         AuditLog::log('UPDATE', 'TECHNICIAN', $tech->id, null, ['status' => $tech->status]);
@@ -501,11 +523,13 @@ class TechnicianController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Technician profile updated.",
-                'data' => $tech,
+                'data'    => $tech,
             ]);
         }
 
-        return back()->with('success', "Technician profile updated.");
+        return back()
+            ->with('success', "Technician profile updated.")
+            ->with('msgb', "Technician profile updated.");
     }
 
     /**
@@ -556,6 +580,7 @@ class TechnicianController extends Controller
         ]);
     }
 
+    // ---------------------- 6. Delete Action ---------------------
     /**
      * Delete technician
      */

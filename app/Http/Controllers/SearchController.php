@@ -12,14 +12,13 @@ use App\Models\JobCard;
 
 class SearchController extends Controller
 {
-    /**
-     * Unified Global Command Search
-     */
+    /* 1. Global Omni-Search Action */
     public function globalSearch(Request $request)
     {
         return $this->search($request);
     }
 
+    /* 1. Filtered Search Execution */
     public function search(Request $request)
     {
         $q = trim((string) $request->input('q', ''));

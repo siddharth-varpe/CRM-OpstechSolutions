@@ -11,7 +11,7 @@
             <h1 class="text-xl sm:text-2xl font-display font-extrabold text-slate-900 tracking-tight">Operations Command Center</h1>
             <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Commercial &amp; Domestic Reverse Osmosis operational status, dues, and dispatch.</p>
         </div>
-        <div class="flex items-center gap-2.5">
+        <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('customers.index') }}?action=create" class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg shadow-2xs transition-colors">
                 <i data-lucide="user-plus" class="w-4 h-4 text-primary-600"></i>
                 <span>+ Customer</span>
@@ -27,8 +27,8 @@
         </div>
     </div>
 
-    <!-- 1. Operational KPI Cards Row (5 Cards) -->
-    <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+    <!-- 1. Operational KPI Cards Row (4 Cards) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         <!-- Card 1: Services Due Today -->
         <a href="{{ route('services.index') }}" class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card hover:shadow-elevated transition-all flex flex-col justify-between group">
             <div class="flex items-center justify-between">
@@ -45,23 +45,7 @@
             </div>
         </a>
 
-        <!-- Card 2: New Inquiries -->
-        <a href="{{ route('inquiries.index') }}" class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card hover:shadow-elevated transition-all flex flex-col justify-between group">
-            <div class="flex items-center justify-between">
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">New Inquiries</span>
-                <div class="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shadow-sm">
-                    <i data-lucide="mail" class="w-4 h-4"></i>
-                </div>
-            </div>
-            <div class="mt-3">
-                <span id="kpi-inquiries-count" class="text-2xl font-display font-extrabold text-slate-900">{{ $cards['newInquiries'] }}</span>
-                <div class="flex items-center gap-1.5 mt-1">
-                    <span id="kpi-inquiries-unread-label" class="text-[11px] font-bold text-sky-600">{{ $cards['inquiriesUnread'] }} to follow-up</span>
-                </div>
-            </div>
-        </a>
-
-        <!-- Card 3: Warranties Expiring -->
+        <!-- Card 2: Warranty Expiries -->
         <a href="{{ route('warranties.index') }}" class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card hover:shadow-elevated transition-all flex flex-col justify-between group">
             <div class="flex items-center justify-between">
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Warranty Expiries</span>
@@ -77,7 +61,7 @@
             </div>
         </a>
 
-        <!-- Card 4: Payments Due -->
+        <!-- Card 3: Payments Due -->
         <a href="{{ route('payments.index') }}" class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card hover:shadow-elevated transition-all flex flex-col justify-between group">
             <div class="flex items-center justify-between">
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Payments Due</span>
@@ -93,8 +77,8 @@
             </div>
         </a>
 
-        <!-- Card 5: Technicians On Duty -->
-        <a href="{{ route('technicians.index') }}" class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card hover:shadow-elevated transition-all flex flex-col justify-between group col-span-2 sm:col-span-1">
+        <!-- Card 4: Technicians On Duty -->
+        <a href="{{ route('technicians.index') }}" class="bg-white p-4 rounded-xl border border-slate-200/90 shadow-card hover:shadow-elevated transition-all flex flex-col justify-between group">
             <div class="flex items-center justify-between">
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Field Technicians</span>
                 <div class="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shadow-sm">
@@ -115,22 +99,22 @@
 
         <!-- Left: Today's Schedule (2 Columns) -->
         <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-card overflow-hidden">
-            <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="calendar-clock" class="w-5 h-5 text-primary-600"></i>
-                    <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Scheduled Services &amp; Dispatches</h2>
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <i data-lucide="calendar-clock" class="w-5 h-5 text-primary-600 shrink-0"></i>
+                    <h2 class="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wider truncate">Scheduled Services &amp; Dispatches</h2>
                 </div>
-                <a href="{{ route('services.index') }}" class="text-xs font-bold text-primary-600 hover:text-primary-800">View All &rarr;</a>
+                <a href="{{ route('services.index') }}" class="text-xs font-bold text-primary-600 hover:text-primary-800 shrink-0">View All &rarr;</a>
             </div>
             <div id="dashboard-schedule-list" class="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
                 @forelse($schedule as $srv)
                     <a href="{{ route('services.show', $srv->id) }}" class="p-4 hover:bg-slate-50 transition-colors flex items-start justify-between gap-3 block group">
-                        <div class="flex items-start gap-3">
+                        <div class="flex items-start gap-3 min-w-0 flex-1">
                             <div class="p-2 rounded-lg bg-sky-50 text-sky-700 shrink-0 mt-0.5 group-hover:bg-primary-50 group-hover:text-primary-700 transition-colors">
                                 <i data-lucide="wrench" class="w-4 h-4"></i>
                             </div>
-                            <div>
-                                <div class="flex items-center gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-1.5">
                                     <span class="font-bold text-xs text-slate-900 group-hover:text-primary-600 transition-colors">{{ $srv->service_number }}</span>
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $srv->service_classification === 'WARRANTY' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' }}">
                                         {{ $srv->service_classification ?? 'GENERAL' }}
@@ -139,8 +123,8 @@
                                         {{ $srv->status }}
                                     </span>
                                 </div>
-                                <h3 class="text-xs font-semibold text-slate-800 mt-1">{{ $srv->customer->full_name ?? 'Customer' }}</h3>
-                                <p class="text-[11px] text-slate-500">{{ $srv->asset->custom_name ?? ($srv->asset->product->name ?? 'Equipment / Unit') }}</p>
+                                <h3 class="text-xs font-semibold text-slate-800 mt-1 truncate">{{ $srv->customer->full_name ?? 'Customer' }}</h3>
+                                <p class="text-[11px] text-slate-500 truncate">{{ $srv->asset->custom_name ?? ($srv->asset->product->name ?? 'Equipment / Unit') }}</p>
                             </div>
                         </div>
                         <div class="text-right shrink-0">
@@ -286,24 +270,18 @@ $(document).ready(function() {
                     $('#kpi-services-urgent-label').text((cards.servicesUrgent ?? 0) + ' urgent');
                 }
 
-                // 2. Update KPI Card 2 (Inquiries)
-                if ($('#kpi-inquiries-count').length) {
-                    $('#kpi-inquiries-count').text(cards.newInquiries ?? 0);
-                    $('#kpi-inquiries-unread-label').text((cards.inquiriesUnread ?? 0) + ' to follow-up');
-                }
-
-                // 3. Update KPI Card 3 (Warranties)
+                // 2. Update KPI Card 2 (Warranties)
                 if ($('#kpi-warranties-expiring-count').length) {
                     $('#kpi-warranties-expiring-count').text(cards.warrantiesExpiring ?? 0);
                 }
 
-                // 4. Update KPI Card 4 (Payments Due)
+                // 3. Update KPI Card 3 (Payments Due)
                 if ($('#kpi-payments-due-count').length) {
                     $('#kpi-payments-due-count').text(cards.paymentsDue ?? 0);
                     $('#kpi-payments-overdue-label').text((cards.paymentsOverdue ?? 0) + ' overdue');
                 }
 
-                // 5. Update KPI Card 5 (Technicians)
+                // 4. Update KPI Card 4 (Technicians)
                 if ($('#kpi-technicians-duty-count').length) {
                     $('#kpi-technicians-duty-count').text(cards.techniciansOnDuty ?? 0);
                     $('#kpi-technicians-available-label').text('Available: ' + (cards.techniciansAvailable ?? 0));

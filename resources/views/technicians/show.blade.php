@@ -340,12 +340,6 @@
                 <i data-lucide="layers" class="w-4 h-4"></i>
                 <span>Parts Consumed ({{ count($partsUsed) }})</span>
             </button>
-
-            <button type="button" onclick="switchTechTab('payments')"
-                    class="tech-tab-btn flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100" data-tab="payments">
-                <i data-lucide="receipt" class="w-4 h-4"></i>
-                <span>Collections ({{ $payments->count() }})</span>
-            </button>
         </div>
     </div>
 
@@ -490,14 +484,6 @@
                             <span class="text-indigo-900">Total Billed:</span>
                             <span class="font-mono text-indigo-700">₹{{ number_format($financialSummary['totalRevenue'], 2) }}</span>
                         </div>
-                    </div>
-
-                    <div class="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 flex justify-between items-center">
-                        <div>
-                            <span class="text-[11px] text-slate-500 block uppercase font-bold">On-Site Collections:</span>
-                            <span class="text-xs text-slate-700">Verified receipts &amp; payments</span>
-                        </div>
-                        <span class="text-base font-bold font-mono text-emerald-700">₹{{ number_format($financialSummary['totalCollections'], 2) }}</span>
                     </div>
 
                     <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
@@ -1068,71 +1054,6 @@
                                 <td colspan="4" class="p-8 text-center text-slate-400">
                                     <i data-lucide="layers" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
                                     <p class="font-semibold text-xs">No spare parts recorded across completed job cards yet.</p>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- TAB 9: COLLECTIONS & PAYMENTS -->
-    <div id="tab-payments" class="tech-tab-panel hidden space-y-4">
-        <div class="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden">
-            <div class="p-4 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                    <h3 class="text-base font-bold text-slate-900">Payments &amp; Collections Handled ({{ $payments->count() }})</h3>
-                    <p class="text-xs text-slate-500">Customer payments and dues collected on site.</p>
-                </div>
-                <div class="text-xs font-mono font-bold text-emerald-700">
-                    Total: ₹{{ number_format($financialSummary['totalCollections'], 2) }}
-                </div>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
-                    <thead>
-                        <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                            <th class="py-3 px-4">Payment No</th>
-                            <th class="py-3 px-4">Customer</th>
-                            <th class="py-3 px-4">Payment Method</th>
-                            <th class="py-3 px-4 font-mono text-right">Amount</th>
-                            <th class="py-3 px-4 text-center">Status</th>
-                            <th class="py-3 px-4 text-center">Recorded Date</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @forelse($payments as $pay)
-                            <tr class="hover:bg-slate-50/70 transition-colors">
-                                <td class="py-3 px-4 font-mono font-bold text-primary-600">
-                                    {{ $pay->payment_number }}
-                                </td>
-                                <td class="py-3 px-4 font-bold text-slate-900">
-                                    {{ $pay->customer->name ?? 'Customer' }}
-                                </td>
-                                <td class="py-3 px-4">
-                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase font-mono bg-slate-100 text-slate-700">
-                                        {{ $pay->payment_method }}
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4 font-mono text-right font-bold text-emerald-700">
-                                    ₹{{ number_format($pay->amount, 2) }}
-                                </td>
-                                <td class="py-3 px-4 text-center">
-                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono {{ $pay->status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200' }}">
-                                        {{ $pay->status }}
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4 text-center font-mono text-[11px] text-slate-500">
-                                    {{ $pay->payment_date ? $pay->payment_date->format('d M Y') : $pay->created_at->format('d M Y') }}
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="p-8 text-center text-slate-400">
-                                    <i data-lucide="receipt" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                                    <p class="font-semibold text-xs">No collections recorded for this technician yet.</p>
                                 </td>
                             </tr>
                         @endforelse

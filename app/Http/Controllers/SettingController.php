@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 
 class SettingController extends Controller
 {
+    /* 1. View / List Details */
     public function index(Request $request)
     {
         $tab = $request->get('tab', 'business'); // business, numbering, tax, audit, data
@@ -36,6 +37,7 @@ class SettingController extends Controller
         return view('settings.index', compact('settings', 'sequences', 'auditLogs', 'tab'));
     }
 
+    /* 4. Update Action */
     public function update(Request $request)
     {
         $inputs = $request->except(['_token', 'tab']);
@@ -77,9 +79,12 @@ class SettingController extends Controller
             ]);
         }
 
-        return redirect()->route('settings.index', ['tab' => $request->get('tab', 'business')])->with('success', 'Settings updated.');
+        return redirect()->route('settings.index', ['tab' => $request->get('tab', 'business')])
+            ->with('success', 'Settings updated.')
+            ->with('msgb', 'Settings updated.');
     }
 
+    /* 4. Update Action: Document Sequences */
     public function updateSequences(Request $request)
     {
         $sequencesData = $request->input('sequences', []);
@@ -125,13 +130,12 @@ class SettingController extends Controller
             ]);
         }
 
-        return redirect()->route('settings.index', ['tab' => 'numbering'])->with('success', 'Document numbering rules updated.');
+        return redirect()->route('settings.index', ['tab' => 'numbering'])
+            ->with('success', 'Document numbering rules updated.')
+            ->with('msgb', 'Document numbering rules updated.');
     }
 
-    /**
-     * Generate real-time server calculated impact preview of CRM business data cleanup.
-     * Restricted to authenticated Super Administrators.
-     */
+    /* 1. Data Cleanup Preview Action */
     public function cleanDataPreview(Request $request, \App\Services\DataCleanupService $cleanupService)
     {
         if (!$request->user() || !$request->user()->isSuperAdmin()) {
@@ -146,10 +150,7 @@ class SettingController extends Controller
         ]);
     }
 
-    /**
-     * Execute destructive CRM business data cleanup.
-     * Enforces: Super Admin authorization, confirmation phrase, risk acknowledgment, password re-authentication, and concurrency locking.
-     */
+    /* 5. Destructive Cleanup Action */
     public function executeCleanData(\App\Http\Requests\CleanDataRequest $request, \App\Services\DataCleanupService $cleanupService)
     {
         $user = $request->user();

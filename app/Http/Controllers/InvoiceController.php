@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 
 class InvoiceController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     public function index(Request $request)
     {
         $query = Invoice::with(['customer', 'items']);
@@ -25,7 +26,7 @@ class InvoiceController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {
-                      $cq->where('name', 'like', "%{$search}%")
+                      $cq->where('full_name', 'like', "%{$search}%")
                          ->orWhere('phone', 'like', "%{$search}%")
                          ->orWhere('customer_number', 'like', "%{$search}%");
                   });
@@ -74,8 +75,8 @@ class InvoiceController extends Controller
             ]);
         }
 
-        $customers = Customer::orderBy('name')->get();
-        $products = Product::where('status', 'ACTIVE')->orderBy('name')->get();
+        $customers = Customer::where('status', 'ACTIVE')->orderBy('full_name')->get();
+        $products = Product::where('is_active', true)->orderBy('name')->get();
 
         return view('invoices.index', compact(
             'invoices',
@@ -88,6 +89,7 @@ class InvoiceController extends Controller
         ));
     }
 
+    // ---------------------- 2. View Single / Show Details ---------------------
     public function show($id)
     {
         $invoice = Invoice::with(['customer.addresses', 'items.product', 'payments', 'sale'])
@@ -98,6 +100,7 @@ class InvoiceController extends Controller
         return view('invoices.show', compact('invoice'));
     }
 
+    // ---------------------- 3. Insert Action ---------------------
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -118,11 +121,18 @@ class InvoiceController extends Controller
             $customer = Customer::findOrFail($validated['customer_id']);
             $invoiceNumber = BusinessSequence::nextNumber('INVOICE');
 
+            // Explicit input extraction (Senior Blueprint)
+            $customerId  = $validated['customer_id'];
+            $invoiceDate = $validated['invoice_date'];
+            $dueDate     = $validated['due_date'] ?? date('Y-m-d', strtotime('+15 days', strtotime($validated['invoice_date'])));
+            $notes       = $validated['notes'] ?? null;
+            $items       = $validated['items'];
+
             $subtotal = 0;
             $totalTax = 0;
             $itemsData = [];
 
-            foreach ($validated['items'] as $item) {
+            foreach ($items as $item) {
                 $qty = (float)$item['quantity'];
                 $price = (float)$item['unit_price'];
                 $disc = (float)($item['discount'] ?? 0);
@@ -156,9 +166,9 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'id' => (string) Str::uuid(),
                 'invoice_number' => $invoiceNumber,
-                'customer_id' => $customer->id,
-                'invoice_date' => $validated['invoice_date'],
-                'due_date' => $validated['due_date'] ?? date('Y-m-d', strtotime('+15 days', strtotime($validated['invoice_date']))),
+                'customer_id' => $customerId,
+                'invoice_date' => $invoiceDate,
+                'due_date' => $dueDate,
                 'subtotal' => $subtotal,
                 'tax_amount' => $totalTax,
                 'cgst_amount' => $cgst,
@@ -167,7 +177,7 @@ class InvoiceController extends Controller
                 'paid_amount' => 0,
                 'balance_amount' => $totalAmount,
                 'status' => 'ISSUED',
-                'notes' => $validated['notes'] ?? null,
+                'notes' => $notes,
             ]);
 
             foreach ($itemsData as $it) {
@@ -193,10 +203,13 @@ class InvoiceController extends Controller
                 ]);
             }
 
-            return redirect()->route('invoices.show', $invoice->id)->with('success', "Invoice {$invoiceNumber} generated successfully.");
+            return redirect()->route('invoices.show', $invoice->id)
+                ->with('success', "Invoice {$invoiceNumber} generated successfully.")
+                ->with('msgb', "Invoice {$invoiceNumber} generated successfully.");
         });
     }
 
+    // ---------------------- 4. Cancel / Void Action ---------------------
     public function cancel(Request $request, $id)
     {
         $validated = $request->validate([
@@ -229,6 +242,7 @@ class InvoiceController extends Controller
         ]);
     }
 
+    // ---------------------- 5. Email Reminder Action ---------------------
     public function sendDueMail(Request $request, $id)
     {
         $invoice = Invoice::with('customer')->findOrFail($id);
@@ -265,6 +279,7 @@ class InvoiceController extends Controller
         }
     }
 
+    // ---------------------- 6. Export CSV Action ---------------------
     public function exportCsv()
     {
         $invoices = Invoice::with('customer')->orderBy('invoice_date', 'desc')->get();

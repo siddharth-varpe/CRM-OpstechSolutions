@@ -27,7 +27,7 @@
     </div>
 
     <!-- 2. Macro KPI Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gross Invoiced</span>
@@ -55,8 +55,21 @@
                 @php
                     $collectionRate = $totalInvoiced > 0 ? ($totalCollected / $totalInvoiced) * 100 : 0;
                 @endphp
-                {{ number_format($collectionRate, 1) }}% settlement rate
+                {{ number_format($collectionRate, 1) }}% total recovery rate
             </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rental Collections</span>
+                <div class="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                    <i data-lucide="repeat" class="w-4 h-4"></i>
+                </div>
+            </div>
+            <div class="mt-3 text-2xl font-bold text-cyan-600 font-mono">
+                ₹{{ number_format($totalRentalCollected, 2) }}
+            </div>
+            <div class="mt-1 text-xs text-slate-500">{{ $totalRentalPaymentsCount }} rental receipts recorded</div>
         </div>
 
         <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
@@ -72,7 +85,7 @@
             <div class="mt-1 text-xs text-slate-500">Pending customer balance</div>
         </div>
 
-        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs sm:col-span-2 lg:col-span-1">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Warehouse Assets</span>
                 <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -102,6 +115,7 @@
                     <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
                         <th class="p-3">Month</th>
                         <th class="p-3 text-right">Invoiced (₹)</th>
+                        <th class="p-3 text-right">Rental Collected (₹)</th>
                         <th class="p-3 text-right">Collections Realized (₹)</th>
                         <th class="p-3 text-right">Variance / Pending</th>
                         <th class="p-3 text-right">Recovery Rate</th>
@@ -116,6 +130,7 @@
                         <tr class="hover:bg-slate-50/50">
                             <td class="p-3 font-bold text-slate-900">{{ $mr['month'] }}</td>
                             <td class="p-3 text-right font-mono text-slate-800 font-semibold">₹{{ number_format($mr['invoiced'], 2) }}</td>
+                            <td class="p-3 text-right font-mono text-cyan-700 font-semibold">₹{{ number_format($mr['rental_collected'] ?? 0, 2) }}</td>
                             <td class="p-3 text-right font-mono text-emerald-700 font-bold">₹{{ number_format($mr['collected'], 2) }}</td>
                             <td class="p-3 text-right font-mono text-amber-700">₹{{ number_format($var, 2) }}</td>
                             <td class="p-3 text-right font-mono font-bold">
@@ -131,7 +146,7 @@
     </div>
 
     <!-- 4. Operational Breakdown Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <!-- Field Service Operations -->
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 space-y-4">
             <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
@@ -156,6 +171,36 @@
                     <span class="font-mono font-bold text-teal-600">
                         {{ $totalServices > 0 ? number_format(($completedServices / $totalServices) * 100, 1) : 0 }}%
                     </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Equipment Rentals & Subscriptions -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 space-y-4">
+            <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <i data-lucide="repeat" class="w-4 h-4 text-cyan-600"></i>
+                <span>Equipment Rentals &amp; Subscriptions</span>
+            </h3>
+            <div class="space-y-3 text-xs">
+                <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span class="text-slate-500">Active Machine Contracts:</span>
+                    <span class="font-mono font-bold text-slate-900">{{ $activeRentalsCount }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span class="text-slate-500">Monthly Run-Rate (MRR):</span>
+                    <span class="font-mono font-bold text-emerald-600">₹{{ number_format($monthlyRentalRevenue, 2) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span class="text-slate-500">Rental Collections Recorded:</span>
+                    <span class="font-mono font-bold text-cyan-600">₹{{ number_format($totalRentalCollected, 2) }}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span class="text-slate-500">Payments Recorded:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $totalRentalPaymentsCount }} receipts</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-slate-500">Security Deposits Held:</span>
+                    <span class="font-mono font-bold text-purple-600">₹{{ number_format($totalRentalDeposits, 2) }}</span>
                 </div>
             </div>
         </div>

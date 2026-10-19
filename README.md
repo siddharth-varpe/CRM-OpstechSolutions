@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="#"><img src="https://img.shields.io/badge/Version-v1.0.0-0284C7?style=for-the-badge&logo=semver&logoColor=white" alt="Version 1.0.0"></a>
   <a href="#"><img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 12.x"></a>
   <a href="#"><img src="https://img.shields.io/badge/PHP-8.2+-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.2+"></a>
   <a href="#"><img src="https://img.shields.io/badge/TailwindCSS-v3%2Fv4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS"></a>

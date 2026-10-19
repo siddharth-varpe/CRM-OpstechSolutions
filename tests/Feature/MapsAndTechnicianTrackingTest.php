@@ -493,7 +493,8 @@ class MapsAndTechnicianTrackingTest extends TestCase
         $response->assertSee($this->technician->full_name);
         $response->assertSee('Assigned Services');
         $response->assertSee('Job Cards');
-        $response->assertSee('Billing &amp; Revenue', false);
+        $response->assertDontSee('Collections (');
+        $response->assertDontSee('tab-payments');
     }
 
     public function test_reset_technician_portal_pin(): void

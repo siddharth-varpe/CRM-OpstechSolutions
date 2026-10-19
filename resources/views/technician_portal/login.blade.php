@@ -75,10 +75,6 @@
             </div>
         </div>
 
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-xs font-semibold mb-2">
-            <i data-lucide="wrench" class="w-3.5 h-3.5"></i>
-            <span>Field Technician Portal</span>
-        </div>
         <h1 class="text-xl sm:text-2xl font-display font-extrabold text-slate-900 tracking-tight">Technician PIN Access</h1>
         <p class="text-xs text-slate-500 mt-1">Enter your registered mobile number and 4-digit security PIN</p>
     </div>
@@ -141,11 +137,12 @@
                 </button>
             </form>
 
-            <div class="pt-4 border-t border-slate-100 text-center">
+            <div class="pt-4 border-t border-slate-100 text-center flex flex-col items-center gap-1.5">
                 <a href="{{ route('dashboard') }}" class="text-xs font-medium text-slate-500 hover:text-slate-800 transition inline-flex items-center gap-1.5">
                     <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
                     <span>Return to Main Desktop CRM</span>
                 </a>
+                <span class="text-[10px] text-slate-400 font-mono">Enterprises CRM Tech Portal &bull; v{{ config('app.version', '1.0.0') }}</span>
             </div>
         </div>
     </div>

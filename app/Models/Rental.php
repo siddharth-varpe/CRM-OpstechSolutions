@@ -14,6 +14,7 @@ class Rental extends Model
         'rental_number',
         'customer_id',
         'asset_id',
+        'product_name',
         'start_date',
         'end_date',
         'monthly_fee',

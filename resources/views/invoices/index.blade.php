@@ -18,7 +18,7 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-2.5">
+        <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('invoices.export') }}" class="btn-outline flex items-center gap-2">
                 <i data-lucide="download" class="w-4 h-4 text-slate-500"></i>
                 <span>Export CSV</span>
@@ -271,7 +271,7 @@
                     <select name="customer_id" required class="form-input text-sm">
                         <option value="">Select Customer</option>
                         @foreach($customers as $c)
-                            <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->phone }})</option>
+                            <option value="{{ $c->id }}">{{ $c->full_name ?? $c->name }} ({{ $c->phone }})</option>
                         @endforeach
                     </select>
                 </div>

@@ -1,0 +1,43 @@
+# ==============================================================================
+# Enterprises CRM — Application & Environment Dependencies
+# Install Python packages via: pip install -r requirements.txt
+# ==============================================================================
+#
+# SYSTEM RUNTIME PREREQUISITES:
+# - PHP: >= 8.2 (Extensions: pdo, pdo_sqlite, mbstring, openssl, xml, curl, zip, gd)
+# - Composer: >= 2.2
+# - Node.js: >= 18.0 & npm
+# - Python: >= 3.8 (For Excel / CSV data import parser: scripts/parse_excel.py)
+#
+# APPLICATION INSTALLATION & RUN COMMANDS:
+# 1. Install Python helper requirements:
+#    pip install -r requirements.txt
+#
+# 2. Install PHP backend dependencies:
+#    composer install
+#
+# 3. Install frontend asset dependencies:
+#    npm install
+#    npm run build
+#
+# 4. Initialize Database & Seeders:
+#    php artisan migrate --seed
+#
+# 5. Start CRM Server:
+#    php artisan serve
+# ==============================================================================
+
+# Core Python & Spreadsheet Processing (scripts/parse_excel.py & Data Import)
+openpyxl>=3.1.2
+xlrd>=2.0.1
+pandas>=2.0.0
+numpy>=1.24.0
+python-dateutil>=2.8.2
+
+# HTTP & API Telemetry Integrations (Geocoding & OSRM Routing APIs)
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Terminal & Utility Helpers
+tabulate>=0.9.0
+python-dotenv>=1.0.0

@@ -32,7 +32,7 @@ class TechnicianPortalThemingAndTabsTest extends TestCase
         $response->assertSee('bg-[#F4F6F8]', false);
         $response->assertSee('bg-white', false);
         $response->assertSee('ENTERPRISES');
-        $response->assertSee('Field Technician Portal');
+        $response->assertDontSee('Field Technician Portal');
         $response->assertSee('Security PIN');
         $response->assertSee('Sign In to Technician Portal');
         $response->assertDontSee('Get Login OTP');

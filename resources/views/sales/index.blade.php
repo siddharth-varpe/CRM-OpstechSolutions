@@ -267,13 +267,41 @@
         <form id="formCreateSale" action="{{ route('sales.store') }}" method="POST" class="mt-4 space-y-4">
             @csrf
             <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Customer <span class="text-rose-500">*</span></label>
-                <select name="customer_id" required class="form-input text-sm">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">
+                    Customer <span class="text-rose-500">*</span>
+                </label>
+                
+                <!-- Search Bar for Registered Customers -->
+                <div class="relative mb-2">
+                    <input type="text" 
+                           id="saleCustomerSearch" 
+                           placeholder="Search customer by name, phone, or customer #..." 
+                           autocomplete="off"
+                           class="form-input text-sm pl-9 pr-8"
+                           aria-label="Search registered customers">
+                    <div class="absolute left-3 top-2.5 text-slate-400 pointer-events-none">
+                        <i data-lucide="search" class="w-4 h-4"></i>
+                    </div>
+                    <button type="button" 
+                            id="btnClearSaleCustomerSearch" 
+                            class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                            title="Clear search">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Customer Dropdown just below it -->
+                <select name="customer_id" id="saleCustomerSelect" required class="form-input text-sm">
                     <option value="">Select Customer</option>
                     @foreach($customers as $c)
-                        <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->phone }})</option>
+                        <option value="{{ $c->id }}"
+                                data-search="{{ strtolower(($c->full_name ?? $c->name) . ' ' . $c->phone . ' ' . ($c->customer_number ?? '') . ' ' . ($c->company_name ?? '')) }}"
+                                {{ (request('customer_id') == $c->id) ? 'selected' : '' }}>
+                            {{ $c->full_name ?? $c->name }} ({{ $c->phone }}){{ $c->company_name ? ' - ' . $c->company_name : ($c->customer_number ? ' [' . $c->customer_number . ']' : '') }}
+                        </option>
                     @endforeach
                 </select>
+                <div id="saleCustomerSearchHelp" class="text-[11px] text-slate-500 mt-1 hidden"></div>
             </div>
 
             <div>
@@ -487,6 +515,109 @@ $(document).ready(function() {
     $('#saleQty, #saleUnitPrice, #saleDiscount').on('input', function() {
         recalcSale();
     });
+
+    // Real-time Customer Search & Dropdown Filter
+    const $customerSelect = $('#saleCustomerSelect');
+    const $customerSearch = $('#saleCustomerSearch');
+    const $clearCustomerSearch = $('#btnClearSaleCustomerSearch');
+    const $customerSearchHelp = $('#saleCustomerSearchHelp');
+
+    const customerOptionsList = [];
+    $customerSelect.find('option').each(function() {
+        const val = $(this).val();
+        customerOptionsList.push({
+            value: val,
+            text: $(this).text(),
+            search: ($(this).data('search') || $(this).text()).toString().toLowerCase(),
+            isPlaceholder: (val === '')
+        });
+    });
+
+    function filterCustomerSelect(query) {
+        const currentVal = $customerSelect.val();
+        query = (query || '').trim().toLowerCase();
+
+        if (query.length > 0) {
+            $clearCustomerSearch.removeClass('hidden');
+        } else {
+            $clearCustomerSearch.addClass('hidden');
+            $customerSearchHelp.addClass('hidden').html('');
+        }
+
+        const placeholder = customerOptionsList.find(o => o.isPlaceholder) || { value: '', text: 'Select Customer' };
+
+        if (!query) {
+            $customerSelect.empty();
+            $customerSelect.append(new Option(placeholder.text, placeholder.value));
+            customerOptionsList.filter(o => !o.isPlaceholder).forEach(function(opt) {
+                const isSelected = (opt.value === currentVal && currentVal !== '');
+                $customerSelect.append(new Option(opt.text, opt.value, isSelected, isSelected));
+            });
+            return;
+        }
+
+        const matches = customerOptionsList.filter(function(opt) {
+            return !opt.isPlaceholder && opt.search.includes(query);
+        });
+
+        $customerSelect.empty();
+
+        if (matches.length === 0) {
+            $customerSelect.append(new Option('No registered customers match "' + query + '"', '', true, true));
+            $customerSearchHelp.removeClass('hidden').html(
+                '<span class="text-rose-500 font-medium">No registered customers found matching "' + $('<div>').text(query).html() + '"</span>'
+            );
+        } else {
+            $customerSelect.append(new Option('-- Select Customer (' + matches.length + ' matching) --', ''));
+            let matchedPrev = false;
+            matches.forEach(function(opt) {
+                const isSelected = (opt.value === currentVal && currentVal !== '');
+                if (isSelected) matchedPrev = true;
+                $customerSelect.append(new Option(opt.text, opt.value, isSelected, isSelected));
+            });
+
+            if (matches.length === 1) {
+                $customerSelect.val(matches[0].value);
+            } else if (!matchedPrev) {
+                $customerSelect.val('');
+            }
+
+            $customerSearchHelp.removeClass('hidden').html(
+                '<span class="text-slate-500">Found ' + matches.length + ' matching registered customer' + (matches.length > 1 ? 's' : '') + '</span>'
+            );
+        }
+    }
+
+    $customerSearch.on('input', function() {
+        filterCustomerSelect($(this).val());
+    });
+
+    $customerSearch.on('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $customerSelect.focus();
+        }
+    });
+
+    $clearCustomerSearch.on('click', function() {
+        $customerSearch.val('');
+        filterCustomerSelect('');
+        $customerSearch.focus();
+    });
+
+    // Handle URL action=create & customer_id pre-selection
+    const saleUrlParams = new URLSearchParams(window.location.search);
+    if (saleUrlParams.get('action') === 'create') {
+        CRM.openModal('modalCreateSale');
+        const cid = saleUrlParams.get('customer_id');
+        if (cid) {
+            $customerSelect.val(cid);
+        }
+    }
+
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
 
     CRM.handleAjaxForm('#formCreateSale', function(res) {
         CRM.toast(res.message || 'Sale created successfully!');

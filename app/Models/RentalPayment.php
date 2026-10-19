@@ -11,11 +11,14 @@ class RentalPayment extends Model
 
     protected $fillable = [
         'id',
+        'payment_number',
         'rental_id',
         'billing_month',
         'amount',
         'due_date',
         'paid_date',
+        'payment_method',
+        'reference_number',
         'status',
         'invoice_id',
         'notes',

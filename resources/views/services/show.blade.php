@@ -69,6 +69,14 @@
                     <span>Complete Service</span>
                 </button>
             @endif
+
+            <button type="button" 
+                    onclick="confirmDeleteService('{{ $service->id }}', '{{ $service->service_number }}')" 
+                    class="btn-outline flex items-center gap-2 text-rose-600 border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition-colors" 
+                    title="Delete Scheduled Service">
+                <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
+                <span>Delete Service</span>
+            </button>
         </div>
     </div>
 
@@ -230,6 +238,62 @@
                 </div>
             </div>
 
+            <!-- Parts Replaced On-Site Breakdown -->
+            <div class="mt-4 pt-4 border-t border-slate-200">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <i data-lucide="layers" class="w-4 h-4 text-sky-600"></i>
+                        <span>Parts Replaced On-Site</span>
+                    </span>
+                    <button type="button" onclick="CRM.openModal('modalManageParts')" class="btn-outline py-1 px-2.5 text-xs text-sky-700 border-sky-300 hover:bg-sky-50 inline-flex items-center gap-1">
+                        <i data-lucide="wrench" class="w-3.5 h-3.5"></i>
+                        <span>Manage / Update Parts</span>
+                    </button>
+                </div>
+
+                @php
+                    $partsList = $service->jobCard->formatted_parts ?? [];
+                @endphp
+
+                @if(!empty($partsList))
+                    <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                                <tr>
+                                    <th class="py-2.5 px-3">Part Name</th>
+                                    <th class="py-2.5 px-3 text-center">Qty</th>
+                                    <th class="py-2.5 px-3 text-right">Unit Price (₹)</th>
+                                    <th class="py-2.5 px-3 text-right">Total (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach($partsList as $p)
+                                    <tr class="hover:bg-slate-50/50">
+                                        <td class="py-2.5 px-3 font-medium text-slate-800">{{ $p['name'] }}</td>
+                                        <td class="py-2.5 px-3 text-center font-mono font-bold">{{ $p['quantity'] }}</td>
+                                        <td class="py-2.5 px-3 text-right font-mono text-slate-600">₹{{ number_format($p['price'], 2) }}</td>
+                                        <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">₹{{ number_format($p['total'], 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="bg-slate-50/75 border-t border-slate-200 font-bold text-slate-800">
+                                <tr>
+                                    <td colspan="3" class="py-2.5 px-3 text-right uppercase text-[11px] text-slate-500">Total Parts Charges:</td>
+                                    <td class="py-2.5 px-3 text-right font-mono text-sky-700">₹{{ number_format($service->jobCard->parts_charges, 2) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                @else
+                    <div class="bg-slate-50 rounded-xl p-3 border border-dashed border-slate-200 text-slate-500 text-xs flex items-center justify-between">
+                        <span>No spare parts recorded on-site for this service yet.</span>
+                        <button type="button" onclick="CRM.openModal('modalManageParts')" class="text-sky-600 hover:text-sky-700 font-semibold text-xs">
+                            + Add Replaced Parts
+                        </button>
+                    </div>
+                @endif
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200 text-xs">
                 <div class="bg-slate-50 p-3 rounded-xl">
                     <span class="text-slate-500">Labor Charges:</span>
@@ -378,6 +442,130 @@ function updateAdminStatus(status, reason) {
         }
     });
 }
+
+window.confirmDeleteService = function(serviceId, serviceNumber) {
+    if (!confirm(`Are you sure you want to delete scheduled service ${serviceNumber}? This action cannot be undone.`)) {
+        return;
+    }
+
+    $.ajax({
+        url: `/services/${serviceId}`,
+        type: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        },
+        data: {
+            _token: '{{ csrf_token() }}'
+        },
+        success: function(res) {
+            if (window.showToast) {
+                window.showToast(res.message || `Scheduled service ${serviceNumber} deleted successfully.`, 'success');
+            } else if (typeof CRM !== 'undefined' && CRM.toast) {
+                CRM.toast(res.message || `Scheduled service ${serviceNumber} deleted successfully.`, 'success');
+            } else {
+                alert(res.message || `Scheduled service ${serviceNumber} deleted successfully.`);
+            }
+            setTimeout(function() {
+                window.location.href = "{{ route('services.index') }}";
+            }, 400);
+        },
+        error: function(xhr) {
+            const msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to delete scheduled service.';
+            if (window.showToast) {
+                window.showToast(msg, 'danger');
+            } else if (typeof CRM !== 'undefined' && CRM.toast) {
+                CRM.toast(msg, 'error');
+            } else {
+                alert(msg);
+            }
+        }
+    });
+};
+
+CRM.handleAjaxForm('#formManageParts', function(res) {
+    CRM.toast(res.message || 'Service spare parts updated successfully!', 'success');
+    setTimeout(() => location.reload(), 500);
+});
+
+let adminPartRowCounter = {{ count($partsList ?? []) }};
+
+function adminAddCataloguePart() {
+    const $select = $('#adminCatalogueSelect');
+    const name = $select.val();
+    if (!name) return;
+    const price = $select.find(':selected').data('price') || 0;
+    adminAppendPartRow(name, 1, price);
+    $select.val('');
+}
+
+function adminAddBlankPartRow() {
+    adminAppendPartRow('', 1, 0);
+}
+
+function adminAppendPartRow(name, qty, price) {
+    $('#adminNoPartsPlaceholder').remove();
+    adminPartRowCounter++;
+    const idx = adminPartRowCounter;
+
+    const rowHtml = `
+        <div class="admin-part-row p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 animate-in fade-in">
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-bold text-slate-700 font-mono">Part #${idx}</span>
+                <button type="button" class="btn-admin-remove-part text-slate-400 hover:text-rose-600 p-1 transition cursor-pointer" title="Remove part">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div>
+                <input type="text" name="parts_replaced[${idx}][name]" value="${$('<div>').text(name).html()}" placeholder="Part name / description (e.g. Kemflo Pump, Sediment Filter...)" class="admin-part-name form-input text-xs" required>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                    <label class="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">Quantity</label>
+                    <input type="number" name="parts_replaced[${idx}][quantity]" min="1" value="${qty}" class="admin-part-qty form-input text-xs font-mono font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">Unit Price (₹)</label>
+                    <input type="number" name="parts_replaced[${idx}][price]" min="0" step="0.01" value="${price}" class="admin-part-price form-input text-xs font-mono font-bold text-right">
+                </div>
+            </div>
+        </div>
+    `;
+
+    $('#adminPartsListContainer').append(rowHtml);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    adminRecalculatePartsModal();
+}
+
+function adminRecalculatePartsModal() {
+    let count = 0;
+    let total = 0;
+    $('.admin-part-row').each(function() {
+        const qty = Math.max(1, parseInt($(this).find('.admin-part-qty').val()) || 1);
+        const price = Math.max(0, parseFloat($(this).find('.admin-part-price').val()) || 0);
+        count += qty;
+        total += Math.round(qty * price * 100) / 100;
+    });
+
+    $('#adminPartsCountBadge').text(count);
+    $('#adminPartsTotalBadge').text('₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    $('#adminCalculatedPartsCharges').val(total.toFixed(2));
+}
+
+$(document).on('input change', '.admin-part-qty, .admin-part-price', function() {
+    adminRecalculatePartsModal();
+});
+
+$(document).on('click', '.btn-admin-remove-part', function() {
+    $(this).closest('.admin-part-row').remove();
+    if ($('.admin-part-row').length === 0) {
+        $('#adminPartsListContainer').html(`
+            <div id="adminNoPartsPlaceholder" class="p-4 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                No parts added yet. Select from the catalogue above or click "+ Add Custom Part".
+            </div>
+        `);
+    }
+    adminRecalculatePartsModal();
+});
 </script>
 
 <!-- Modal: Hold Service (Admin) -->
@@ -413,6 +601,103 @@ function updateAdminStatus(status, reason) {
                 <button type="button" onclick="CRM.closeModal('modalHoldServiceAdmin')" class="btn-outline">Cancel</button>
                 <button type="submit" class="btn-primary bg-amber-600 hover:bg-amber-700 text-white">
                     Confirm Hold
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Manage Replaced Parts (Admin) -->
+<div id="modalManageParts" class="modal-backdrop hidden">
+    <div class="modal-box max-w-xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+            <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+                <i data-lucide="layers" class="w-5 h-5 text-sky-600"></i>
+                <span>Manage Parts Replaced On-Site</span>
+            </h3>
+            <button onclick="CRM.closeModal('modalManageParts')" class="text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form id="formManageParts" action="{{ route('services.parts.update', $service->id) }}" method="POST" class="mt-4 space-y-4">
+            @csrf
+
+            <!-- Quick Add from Catalogue -->
+            <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                <label class="block text-xs font-semibold text-slate-700">Quick-Add from Parts Catalogue</label>
+                <div class="flex gap-2">
+                    <select id="adminCatalogueSelect" class="form-input text-xs flex-1">
+                        <option value="">Select a catalogue spare part...</option>
+                        @foreach($spares ?? [] as $sp)
+                            <option value="{{ $sp->name }}" data-price="{{ $sp->selling_price }}">
+                                {{ $sp->name }} (₹{{ number_format($sp->selling_price, 2) }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <button type="button" onclick="adminAddCataloguePart()" class="btn-primary py-1 px-3 text-xs bg-sky-600 hover:bg-sky-700 text-white shrink-0 flex items-center gap-1">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>Add</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Part Addition -->
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Parts List</span>
+                <button type="button" onclick="adminAddBlankPartRow()" class="text-xs font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-lg transition inline-flex items-center gap-1">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                    <span>+ Add Custom Part</span>
+                </button>
+            </div>
+
+            <!-- Dynamic Table of Parts -->
+            <div id="adminPartsListContainer" class="space-y-2.5">
+                @php
+                    $existingParts = $service->jobCard ? ($service->jobCard->formatted_parts ?? []) : [];
+                @endphp
+                @forelse($existingParts as $idx => $p)
+                    <div class="admin-part-row p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-slate-700 font-mono">Part #{{ $idx + 1 }}</span>
+                            <button type="button" class="btn-admin-remove-part text-slate-400 hover:text-rose-600 p-1" title="Remove part">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div>
+                            <input type="text" name="parts_replaced[{{ $idx }}][name]" value="{{ $p['name'] }}" placeholder="Part name / description" class="admin-part-name form-input text-xs" required>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <label class="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">Quantity</label>
+                                <input type="number" name="parts_replaced[{{ $idx }}][quantity]" min="1" value="{{ $p['quantity'] }}" class="admin-part-qty form-input text-xs font-mono font-bold">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">Unit Price (₹)</label>
+                                <input type="number" name="parts_replaced[{{ $idx }}][price]" min="0" step="0.01" value="{{ $p['price'] }}" class="admin-part-price form-input text-xs font-mono font-bold text-right">
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div id="adminNoPartsPlaceholder" class="p-4 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                        No parts added yet. Select from the catalogue above or click "+ Add Custom Part".
+                    </div>
+                @endforelse
+            </div>
+
+            <!-- Financial Summary in Modal -->
+            <div class="p-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between text-xs">
+                <span class="font-medium text-slate-600">Total Parts Replaced: <strong id="adminPartsCountBadge" class="font-mono text-slate-900">{{ count($existingParts) }}</strong></span>
+                <span class="font-bold text-slate-800">
+                    Total Parts Cost: <span id="adminPartsTotalBadge" class="font-mono text-sky-700 font-black text-sm">₹{{ number_format($service->jobCard->parts_charges ?? 0, 2) }}</span>
+                </span>
+            </div>
+            <input type="hidden" name="parts_charges" id="adminCalculatedPartsCharges" value="{{ $service->jobCard->parts_charges ?? 0 }}">
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button type="button" onclick="CRM.closeModal('modalManageParts')" class="btn-outline">Cancel</button>
+                <button type="submit" class="btn-primary bg-sky-600 hover:bg-sky-700 text-white">
+                    Save Parts Changes
                 </button>
             </div>
         </form>

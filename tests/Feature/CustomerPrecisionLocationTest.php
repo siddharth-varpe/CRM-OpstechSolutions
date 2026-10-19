@@ -160,7 +160,7 @@ class CustomerPrecisionLocationTest extends TestCase
 
         $this->assertTrue($json['success']);
         $this->assertStringContainsString('https://www.google.com/maps/dir/?api=1', $json['googleMapsUrl']);
-        $this->assertStringContainsString("destination={$testLat},{$testLng}", $json['googleMapsUrl']);
+        $this->assertStringContainsString('Survey+55', $json['googleMapsUrl']);
         $this->assertStringContainsString('travelmode=driving', $json['googleMapsUrl']);
 
         $destination = $json['destination'];

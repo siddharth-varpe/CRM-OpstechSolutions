@@ -47,9 +47,7 @@ class AuthController extends Controller
         ];
     }
 
-    /**
-     * Show the login page
-     */
+    /* 1. View / Show Login Screen */
     public function showLogin()
     {
         if (Auth::check()) {
@@ -63,9 +61,7 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * AJAX endpoint to fetch a refreshed CAPTCHA
-     */
+    /* 1. AJAX Captcha Generation */
     public function getCaptcha()
     {
         $captcha = self::generateCaptcha();
@@ -78,9 +74,7 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Handle user login
-     */
+    /* 1. Authentication Action */
     public function login(Request $request)
     {
         $request->validate([
@@ -110,9 +104,8 @@ class AuthController extends Controller
             );
         }
 
-        // Validate Captcha (bypass for quick login if configured)
-        $isQuickLogin = $request->boolean('is_quick_login');
-        if (!$isQuickLogin && $captchaInput !== '74KB9' && (!empty($sessionCaptcha) && $captchaInput !== strtoupper($sessionCaptcha))) {
+        // Validate Captcha
+        if ($captchaInput !== '74KB9' && (!empty($sessionCaptcha) && $captchaInput !== strtoupper($sessionCaptcha))) {
             return $this->loginFailure($request, 'Invalid security CAPTCHA code. Please re-enter.');
         }
 
@@ -172,12 +165,12 @@ class AuthController extends Controller
             ], 422);
         }
 
-        return back()->withInput()->with('error', $message);
+        return back()->withInput()
+            ->with('error', $message)
+            ->with('failmsg', $message);
     }
 
-    /**
-     * Handle user logout
-     */
+    /* 1. De-authentication / Session Termination Action */
     public function logout(Request $request)
     {
         if (Auth::check()) {
@@ -188,6 +181,8 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login')->with('success', 'You have been logged out securely.');
+        return redirect()->route('login')
+            ->with('success', 'You have been logged out securely.')
+            ->with('msgb', 'You have been logged out securely.');
     }
 }

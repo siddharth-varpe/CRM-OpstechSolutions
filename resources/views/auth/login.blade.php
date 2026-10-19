@@ -198,16 +198,7 @@
                     <i data-lucide="arrow-right" class="w-4 h-4"></i>
                 </button>
 
-                <!-- Quick One-Click Login (Pre-fills and automatically signs in) -->
-                <div class="pt-2 border-t border-slate-100 mt-4 flex items-center justify-between">
-                    <button
-                        type="button"
-                        id="quick-login-btn"
-                        class="text-xs font-semibold text-primary-600 hover:text-primary-800 flex items-center gap-1.5 focus:outline-none"
-                    >
-                        <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
-                        <span>One-Click Admin Demo Login</span>
-                    </button>
+                <div class="pt-3 border-t border-slate-100 mt-4 flex items-center justify-end">
                     <a href="{{ route('technician.login') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1">
                         <i data-lucide="smartphone" class="w-3.5 h-3.5 text-slate-400"></i>
                         <span>Technician Portal</span>
@@ -279,15 +270,6 @@ $(document).ready(function() {
                 $('#refresh-captcha').click();
             }
         });
-    });
-
-    // One-Click Admin Demo Login
-    $('#quick-login-btn').on('click', function() {
-        $('#username').val('admin');
-        $('#password').val('admin');
-        $('#captcha').val('74KB9');
-        $('#login-form').append('<input type="hidden" name="is_quick_login" value="1">');
-        $('#login-form').submit();
     });
 });
 </script>

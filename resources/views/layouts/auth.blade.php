@@ -74,8 +74,10 @@
     @yield('content')
     
     <!-- Footer -->
-    <footer class="pt-4 pb-2 text-center text-xs text-slate-500 font-medium">
+    <footer class="pt-4 pb-2 text-center text-xs text-slate-500 font-medium flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2">
         <span>&copy; {{ date('Y') }} Enterprises CRM. All Rights Reserved. Commercial Water Purification SaaS.</span>
+        <span class="hidden sm:inline text-slate-300">&bull;</span>
+        <span class="font-mono text-[11px] text-slate-400">v{{ config('app.version', '1.0.0') }}</span>
     </footer>
 
     <script>

@@ -62,4 +62,50 @@ class JobCard extends Model
     {
         return $this->belongsTo(Technician::class, 'technician_id');
     }
+
+    public function getFormattedPartsAttribute(): array
+    {
+        $parts = $this->parts_replaced;
+        if (is_string($parts)) {
+            $decoded = json_decode($parts, true);
+            if (is_array($decoded)) {
+                $parts = $decoded;
+            } else {
+                $split = preg_split('/[\r\n,]+/', $parts);
+                $split = array_values(array_filter(array_map('trim', $split)));
+                $parts = !empty($split) ? $split : [trim($parts)];
+            }
+        }
+        if (!is_array($parts)) {
+            return [];
+        }
+
+        $formatted = [];
+        foreach ($parts as $p) {
+            if (is_string($p)) {
+                $p = trim($p);
+                if ($p !== '') {
+                    $formatted[] = [
+                        'name' => $p,
+                        'quantity' => 1,
+                        'price' => 0.00,
+                        'total' => 0.00,
+                    ];
+                }
+            } elseif (is_array($p)) {
+                $name = trim($p['name'] ?? $p['item_name'] ?? '');
+                if ($name !== '') {
+                    $qty = max(1, (int)($p['quantity'] ?? $p['qty'] ?? 1));
+                    $price = max(0, (float)($p['price'] ?? $p['unit_price'] ?? $p['cost'] ?? 0));
+                    $formatted[] = [
+                        'name' => $name,
+                        'quantity' => $qty,
+                        'price' => $price,
+                        'total' => (float)($p['total'] ?? round($qty * $price, 2)),
+                    ];
+                }
+            }
+        }
+        return $formatted;
+    }
 }

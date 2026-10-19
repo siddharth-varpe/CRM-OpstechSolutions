@@ -124,4 +124,28 @@ class BrandingRemovalTest extends TestCase
         $this->assertStringNotContainsString('SR Enterprises', $companySetting);
         $this->assertEquals('Enterprises CRM', $companySetting);
     }
+
+    /**
+     * Test developer branding 'Developed by Kartik & Siddharth' is removed and version 1.0.0 is displayed.
+     */
+    public function test_branding_does_not_contain_kartik_and_siddharth_and_shows_version(): void
+    {
+        $loginResponse = $this->get(route('login'));
+        $loginResponse->assertStatus(200);
+        $loginResponse->assertDontSee('Developed by Kartik & Siddharth', false);
+        $loginResponse->assertDontSee('Kartik', false);
+        $loginResponse->assertSee('v1.0.0');
+
+        $dashResponse = $this->actingAs($this->admin)->get(route('dashboard'));
+        $dashResponse->assertStatus(200);
+        $dashResponse->assertDontSee('Developed by Kartik & Siddharth', false);
+        $dashResponse->assertDontSee('Kartik', false);
+        $dashResponse->assertSee('v1.0.0');
+
+        $techLogin = $this->get(route('tech_portal.login'));
+        $techLogin->assertStatus(200);
+        $techLogin->assertDontSee('Developed by Kartik & Siddharth', false);
+        $techLogin->assertDontSee('Kartik', false);
+        $techLogin->assertSee('v1.0.0');
+    }
 }

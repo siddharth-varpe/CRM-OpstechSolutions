@@ -385,6 +385,21 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+        Payment::firstOrCreate(
+            ['invoice_id' => $invoice->id],
+            [
+                'payment_number' => 'PAY-2026-0000',
+                'customer_id' => $customer->id,
+                'amount' => 45430.00,
+                'payment_date' => now()->subMonths(3),
+                'payment_method' => 'BANK_TRANSFER',
+                'status' => 'COMPLETED',
+                'reference_number' => 'NEFT-HDFC-991284',
+                'notes' => 'Settled in full upon installation',
+                'created_by' => $admin->id,
+            ]
+        );
+
         // 10. Scheduled Service for Technician
         $srvNum = BusinessSequence::nextNumber('SERVICE');
         $service = Service::firstOrCreate(

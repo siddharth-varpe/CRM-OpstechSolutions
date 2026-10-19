@@ -13,6 +13,7 @@ use Carbon\Carbon;
 
 class AssetController extends Controller
 {
+    // ---------------------- 1. Insert Action ---------------------
     /**
      * Store new customer asset and automatically mint warranty & service schedules
      */
@@ -39,20 +40,26 @@ class AssetController extends Controller
 
         return DB::transaction(function () use ($validated, $request) {
             $assetNumber = BusinessSequence::nextNumber('ASSET');
+
+            // Explicit input extraction (Senior Blueprint)
+            $custId         = $validated['customer_id'];
+            $prodId         = $validated['product_id'];
+            $customName     = $validated['custom_name'] ?? null;
+            $serialNumber   = $validated['serial_number'] ?? null;
             $warrantyMonths = (int) ($validated['initial_warranty_months'] ?? 12);
-            $purchaseDate = Carbon::parse($validated['purchase_date']);
+            $purchaseDate   = Carbon::parse($validated['purchase_date']);
 
             $asset = CustomerAsset::create([
-                'asset_number' => $assetNumber,
-                'customer_id' => $validated['customer_id'],
-                'product_id' => $validated['product_id'],
-                'asset_type' => 'RO_MACHINE',
-                'custom_name' => $validated['custom_name'] ?? null,
-                'serial_number' => $validated['serial_number'] ?? null,
-                'purchase_date' => $purchaseDate,
+                'asset_number'            => $assetNumber,
+                'customer_id'             => $custId,
+                'product_id'              => $prodId,
+                'asset_type'              => 'RO_MACHINE',
+                'custom_name'             => $customName,
+                'serial_number'           => $serialNumber,
+                'purchase_date'           => $purchaseDate,
                 'initial_warranty_months' => $warrantyMonths,
                 'service_interval_months' => 3,
-                'status' => 'ACTIVE',
+                'status'                  => 'ACTIVE',
             ]);
 
             // Automatically generate Warranty contract if months > 0
@@ -62,14 +69,14 @@ class AssetController extends Controller
 
                 $warranty = Warranty::create([
                     'warranty_number' => $warrantyNumber,
-                    'customer_id' => $asset->customer_id,
-                    'asset_id' => $asset->id,
-                    'warranty_type' => 'STANDARD_MACHINE',
-                    'start_date' => $purchaseDate,
-                    'end_date' => $endDate,
+                    'customer_id'     => $asset->customer_id,
+                    'asset_id'        => $asset->id,
+                    'warranty_type'   => 'STANDARD_MACHINE',
+                    'start_date'      => $purchaseDate,
+                    'end_date'        => $endDate,
                     'duration_months' => $warrantyMonths,
-                    'status' => 'ACTIVE',
-                    'terms' => 'Standard warranty covering internal electrical booster pump, SMPS, and electronic valves.',
+                    'status'          => 'ACTIVE',
+                    'terms'           => 'Standard warranty covering internal electrical booster pump, SMPS, and electronic valves.',
                 ]);
 
                 // Generate quarterly periodic maintenance schedules (e.g. 4 schedules for 12 months)
@@ -79,14 +86,14 @@ class AssetController extends Controller
                 for ($i = 1; $i <= $numSchedules; $i++) {
                     $plannedDate = $purchaseDate->copy()->addMonths($i * $intervalMonths);
                     ServiceSchedule::create([
-                        'customer_id' => $asset->customer_id,
-                        'asset_id' => $asset->id,
-                        'warranty_id' => $warranty->id,
-                        'schedule_index' => $i,
+                        'customer_id'     => $asset->customer_id,
+                        'asset_id'        => $asset->id,
+                        'warranty_id'     => $warranty->id,
+                        'schedule_index'  => $i,
                         'total_schedules' => $numSchedules,
-                        'planned_date' => $plannedDate,
-                        'target_month' => $plannedDate->format('Y-m'),
-                        'status' => 'PENDING',
+                        'planned_date'    => $plannedDate,
+                        'target_month'    => $plannedDate->format('Y-m'),
+                        'status'          => 'PENDING',
                     ]);
                 }
             }
@@ -97,11 +104,13 @@ class AssetController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => "Machine asset {$asset->asset_number} registered with automated warranty schedules.",
-                    'reload' => true,
+                    'reload'  => true,
                 ]);
             }
 
-            return back()->with('success', "Machine asset {$asset->asset_number} registered.");
+            return back()
+                ->with('success', "Machine asset {$asset->asset_number} registered.")
+                ->with('msgb', "Machine asset {$asset->asset_number} registered.");
         });
     }
 }

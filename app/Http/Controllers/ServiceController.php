@@ -10,6 +10,9 @@ use App\Models\Technician;
 use App\Models\Warranty;
 use App\Models\BusinessSequence;
 use App\Models\AuditLog;
+use App\Models\ServiceSchedule;
+use App\Models\Invoice;
+use App\Models\InventoryItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +20,7 @@ use Carbon\Carbon;
 
 class ServiceController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     public function index(Request $request)
     {
         $query = Service::with(['customer', 'asset.product', 'technician', 'jobCard']);
@@ -97,6 +101,7 @@ class ServiceController extends Controller
         ));
     }
 
+    // ---------------------- 2. Calendar & Heatmap Metrics ---------------------
     /**
      * AJAX endpoint to fetch service schedule counts and details for a given month
      */
@@ -169,6 +174,7 @@ class ServiceController extends Controller
         ];
     }
 
+    // ---------------------- 3. Add Service Record View ---------------------
     public function create(Request $request)
     {
         $customers = Customer::where('status', 'ACTIVE')->orderBy('full_name')->get();
@@ -199,6 +205,7 @@ class ServiceController extends Controller
         return view('services.create', compact('customers', 'technicians', 'assets', 'prefill'));
     }
 
+    // ---------------------- 4. View Customer Assets Helper ---------------------
     public function customerAssets($id)
     {
         $assets = CustomerAsset::with(['product', 'activeWarranty'])
@@ -232,6 +239,7 @@ class ServiceController extends Controller
         ]);
     }
 
+    // ---------------------- 5. View Single / Show Details ---------------------
     public function show($id)
     {
         $service = Service::with(['customer.addresses', 'asset.product', 'technician', 'jobCard', 'warranty'])
@@ -240,10 +248,12 @@ class ServiceController extends Controller
             ->firstOrFail();
 
         $technicians = Technician::where('status', 'ACTIVE')->get();
+        $spares = InventoryItem::where('status', 'ACTIVE')->orderBy('name')->get();
 
-        return view('services.show', compact('service', 'technicians'));
+        return view('services.show', compact('service', 'technicians', 'spares'));
     }
 
+    // ---------------------- 6. Insert Action ---------------------
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -364,10 +374,13 @@ class ServiceController extends Controller
                 ]);
             }
 
-            return redirect()->route('services.show', $service->id)->with('success', "Service {$serviceNumber} scheduled successfully.");
+            return redirect()->route('services.show', $service->id)
+                ->with('success', "Service {$serviceNumber} scheduled successfully.")
+                ->with('msgb', "Service {$serviceNumber} scheduled successfully.");
         });
     }
 
+    // ---------------------- 7. Assign Technician Action ---------------------
     public function assignTechnician(Request $request, $id)
     {
         $validated = $request->validate([
@@ -393,6 +406,7 @@ class ServiceController extends Controller
         ]);
     }
 
+    // ---------------------- 8. Complete Service Action ---------------------
     public function complete(Request $request, $id)
     {
         $validated = $request->validate([
@@ -400,20 +414,63 @@ class ServiceController extends Controller
             'work_performed' => 'required|string',
             'labor_charges' => 'nullable|numeric|min:0',
             'parts_charges' => 'nullable|numeric|min:0',
-            'parts_replaced' => 'nullable|string',
+            'parts_replaced' => 'nullable',
             'technician_notes' => 'nullable|string',
             'customer_remarks' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($validated, $id) {
+        return DB::transaction(function () use ($validated, $request, $id) {
             $service = Service::with('jobCard')->findOrFail($id);
             $service->update([
                 'status' => 'COMPLETED',
                 'completed_at' => now(),
             ]);
 
+            // Normalize parts replaced
+            $partsReplaced = null;
+            $calculatedPartsTotal = 0.0;
+            $rawParts = $request->input('parts_replaced');
+            if (is_string($rawParts)) {
+                $decoded = json_decode($rawParts, true);
+                $rawParts = is_array($decoded) ? $decoded : [['name' => $rawParts, 'quantity' => 1, 'price' => 0]];
+            }
+
+            if (!empty($rawParts) && is_array($rawParts)) {
+                $normalized = [];
+                foreach ($rawParts as $item) {
+                    if (is_string($item)) {
+                        $name = trim($item);
+                        if ($name !== '') {
+                            $normalized[] = [
+                                'name' => $name,
+                                'quantity' => 1,
+                                'price' => 0.00,
+                                'total' => 0.00,
+                            ];
+                        }
+                    } elseif (is_array($item)) {
+                        $name = trim($item['name'] ?? $item['item_name'] ?? '');
+                        if ($name !== '') {
+                            $qty = max(1, (int)($item['quantity'] ?? $item['qty'] ?? 1));
+                            $price = max(0, (float)($item['price'] ?? $item['unit_price'] ?? 0));
+                            $lineTotal = round($qty * $price, 2);
+                            $calculatedPartsTotal += $lineTotal;
+                            $normalized[] = [
+                                'name' => $name,
+                                'quantity' => $qty,
+                                'price' => $price,
+                                'total' => $lineTotal,
+                            ];
+                        }
+                    }
+                }
+                $partsReplaced = !empty($normalized) ? $normalized : null;
+            }
+
             $labor = (float)($validated['labor_charges'] ?? 0);
-            $parts = (float)($validated['parts_charges'] ?? 0);
+            $parts = ($request->has('parts_charges') && $request->parts_charges !== null && $request->parts_charges !== '')
+                ? (float)$request->parts_charges
+                : $calculatedPartsTotal;
             $total = $labor + $parts;
 
             if ($service->jobCard) {
@@ -423,6 +480,7 @@ class ServiceController extends Controller
                     'labor_charges' => $labor,
                     'parts_charges' => $parts,
                     'total_charges' => $total,
+                    'parts_replaced' => $partsReplaced,
                     'technician_notes' => $validated['technician_notes'] ?? null,
                     'customer_remarks' => $validated['customer_remarks'] ?? null,
                     'completed_at' => now(),
@@ -455,6 +513,7 @@ class ServiceController extends Controller
         });
     }
 
+    // ---------------------- 9. Update Status Action ---------------------
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -497,5 +556,149 @@ class ServiceController extends Controller
             'message' => "Service status updated to {$validated['status']}.",
             'status' => $validated['status'],
         ]);
+    }
+
+    // ---------------------- 10. Delete Service Action ---------------------
+    public function destroy(Request $request, $id)
+    {
+        return DB::transaction(function () use ($request, $id) {
+            $service = Service::with('jobCard')->where('id', $id)->orWhere('service_number', $id)->firstOrFail();
+
+            $serviceNumber = $service->service_number;
+
+            // 1. Reset any technician currently active/navigating to this service
+            Technician::where('active_service_id', $service->id)->update([
+                'active_service_id' => null,
+                'destination_latitude' => null,
+                'destination_longitude' => null,
+                'tracking_status' => 'ONLINE',
+            ]);
+
+            // 2. Disassociate any linked service schedules
+            ServiceSchedule::where('generated_service_id', $service->id)->update([
+                'generated_service_id' => null,
+                'status' => 'PENDING',
+            ]);
+
+            // 3. Disassociate any linked invoices
+            Invoice::where('service_id', $service->id)->update([
+                'service_id' => null,
+                'job_card_id' => null,
+            ]);
+
+            // 4. Delete the associated Job Card if present
+            if ($service->jobCard) {
+                $service->jobCard->delete();
+            }
+
+            // 5. Audit Log the deletion
+            AuditLog::log('DELETE', 'SERVICE', $service->id, [
+                'service_number' => $serviceNumber,
+                'customer_id' => $service->customer_id,
+                'asset_id' => $service->asset_id,
+                'technician_id' => $service->technician_id,
+                'status' => $service->status,
+                'scheduled_date' => $service->scheduled_date ? $service->scheduled_date->toIso8601String() : null,
+            ], null);
+
+            // 6. Delete the scheduled service record
+            $service->delete();
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Scheduled service {$serviceNumber} deleted successfully.",
+                    'redirect' => route('services.index'),
+                ]);
+            }
+
+            return redirect()->route('services.index')
+                ->with('success', "Scheduled service {$serviceNumber} deleted successfully.")
+                ->with('msgb', "Scheduled service {$serviceNumber} deleted successfully.");
+        });
+    }
+
+    // ---------------------- 11. Update Parts Replaced Action ---------------------
+    public function updateParts(Request $request, $id)
+    {
+        return DB::transaction(function () use ($request, $id) {
+            $service = Service::with('jobCard')->where('id', $id)->orWhere('service_number', $id)->firstOrFail();
+
+            $partsInput = $request->input('parts_replaced', []);
+            if (is_string($partsInput)) {
+                $decoded = json_decode($partsInput, true);
+                $partsInput = is_array($decoded) ? $decoded : [['name' => $partsInput, 'quantity' => 1, 'price' => 0]];
+            }
+
+            $normalized = [];
+            $calculatedPartsTotal = 0.0;
+
+            if (is_array($partsInput)) {
+                foreach ($partsInput as $item) {
+                    if (is_string($item)) {
+                        $name = trim($item);
+                        if ($name !== '') {
+                            $normalized[] = [
+                                'name' => $name,
+                                'quantity' => 1,
+                                'price' => 0.00,
+                                'total' => 0.00,
+                            ];
+                        }
+                    } elseif (is_array($item)) {
+                        $name = trim($item['name'] ?? $item['item_name'] ?? '');
+                        if ($name !== '') {
+                            $qty = max(1, (int)($item['quantity'] ?? $item['qty'] ?? 1));
+                            $price = max(0, (float)($item['price'] ?? $item['unit_price'] ?? 0));
+                            $lineTotal = round($qty * $price, 2);
+                            $calculatedPartsTotal += $lineTotal;
+                            $normalized[] = [
+                                'name' => $name,
+                                'quantity' => $qty,
+                                'price' => $price,
+                                'total' => $lineTotal,
+                            ];
+                        }
+                    }
+                }
+            }
+
+            $partsCharges = ($request->has('parts_charges') && $request->parts_charges !== null && $request->parts_charges !== '')
+                ? (float)$request->input('parts_charges')
+                : $calculatedPartsTotal;
+
+            if ($service->jobCard) {
+                $laborCharges = (float)$service->jobCard->labor_charges;
+                $service->jobCard->update([
+                    'parts_replaced' => !empty($normalized) ? $normalized : null,
+                    'parts_charges' => $partsCharges,
+                    'total_charges' => round($laborCharges + $partsCharges, 2),
+                ]);
+            }
+
+            AuditLog::create([
+                'id' => (string) Str::uuid(),
+                'entity_type' => 'SERVICE',
+                'entity_id' => $service->id,
+                'action' => 'PARTS_UPDATE',
+                'user_id' => auth()->id() ?? 'system',
+                'performed_by' => auth()->user()->name ?? 'Admin Staff',
+                'changes' => json_encode(['parts_replaced' => $normalized, 'parts_charges' => $partsCharges]),
+            ]);
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Service spare parts updated successfully.',
+                    'parts' => $normalized,
+                    'parts_charges' => $partsCharges,
+                    'total_charges' => round(($service->jobCard ? (float)$service->jobCard->labor_charges : 0) + $partsCharges, 2),
+                ]);
+            }
+
+            return redirect()->route('services.show', $service->id)
+                ->with('success', 'Service spare parts updated successfully.')
+                ->with('msgb', 'Service spare parts updated successfully.');
+        });
     }
 }

@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 
 class WarrantyController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     public function index(Request $request)
     {
         $query = Warranty::with(['customer', 'asset.product']);
@@ -46,6 +47,7 @@ class WarrantyController extends Controller
         return view('warranties.index', compact('warranties', 'totalActive', 'totalExpired', 'expiringSoon'));
     }
 
+    // ---------------------- 2. View Single / Show Details ---------------------
     public function show($id)
     {
         $warranty = Warranty::with(['customer.addresses', 'asset.product', 'events', 'schedules.service'])
@@ -56,6 +58,7 @@ class WarrantyController extends Controller
         return view('warranties.show', compact('warranty'));
     }
 
+    // ---------------------- 3. Record Warranty Event Action ---------------------
     public function recordEvent(Request $request, $id)
     {
         $validated = $request->validate([

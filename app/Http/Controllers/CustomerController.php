@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
+    // ---------------------- 1. View / List Details ---------------------
     /**
      * Display a listing of customers with filters and pagination
      */
@@ -80,6 +81,7 @@ class CustomerController extends Controller
         ]);
     }
 
+    // ---------------------- 2. View Single / Show Details ---------------------
     /**
      * Display single customer profile details
      */
@@ -102,6 +104,7 @@ class CustomerController extends Controller
         ]);
     }
 
+    // ---------------------- 3. Insert Action ---------------------
     /**
      * Store a newly created customer
      */
@@ -145,53 +148,67 @@ class CustomerController extends Controller
         return DB::transaction(function () use ($validated, $request) {
             $customerNumber = BusinessSequence::nextNumber('CUSTOMER');
 
+            // Explicit input extraction (Senior Blueprint)
+            $fullName     = $validated['full_name'];
+            $phone        = $validated['phone'];
+            $email        = $validated['email'] ?? null;
+            $customerType = $validated['customer_type'];
+            $companyName  = $validated['company_name'] ?? null;
+            $gstNumber    = $validated['gst_number'] ?? null;
+            $status       = $validated['status'];
+            $custLabel    = $validated['customer_label'] ?? null;
+            $customLblId  = $validated['custom_label_id'] ?? null;
+            $notes        = $validated['notes'] ?? null;
+
             $customer = Customer::create([
                 'customer_number' => $customerNumber,
-                'full_name' => $validated['full_name'],
-                'phone' => $validated['phone'],
-                'email' => $validated['email'] ?? null,
-                'customer_type' => $validated['customer_type'],
-                'company_name' => $validated['company_name'] ?? null,
-                'gst_number' => $validated['gst_number'] ?? null,
-                'status' => $validated['status'],
-                'customer_label' => $validated['customer_label'] ?? null,
-                'custom_label_id' => $validated['custom_label_id'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => auth()->id(),
+                'full_name'       => $fullName,
+                'phone'           => $phone,
+                'email'           => $email,
+                'customer_type'   => $customerType,
+                'company_name'    => $companyName,
+                'gst_number'      => $gstNumber,
+                'status'          => $status,
+                'customer_label'  => $custLabel,
+                'custom_label_id' => $customLblId,
+                'notes'           => $notes,
+                'created_by'      => auth()->id(),
             ]);
 
             $lat = ($request->filled('latitude') && (float)$validated['latitude'] != 0.0) ? (float)$validated['latitude'] : null;
             $lng = ($request->filled('longitude') && (float)$validated['longitude'] != 0.0) ? (float)$validated['longitude'] : null;
 
             CustomerAddress::create([
-                'customer_id' => $customer->id,
-                'address_type' => 'BOTH',
+                'customer_id'   => $customer->id,
+                'address_type'  => 'BOTH',
                 'address_line1' => $validated['address_line1'],
                 'address_line2' => $validated['address_line2'] ?? null,
-                'landmark' => $validated['landmark'] ?? null,
-                'city' => $validated['city'],
-                'state' => $validated['state'],
-                'postal_code' => $validated['postal_code'],
-                'latitude' => $lat,
-                'longitude' => $lng,
-                'is_default' => true,
+                'landmark'      => $validated['landmark'] ?? null,
+                'city'          => $validated['city'],
+                'state'         => $validated['state'],
+                'postal_code'   => $validated['postal_code'],
+                'latitude'      => $lat,
+                'longitude'     => $lng,
+                'is_default'    => true,
             ]);
 
             AuditLog::log('CREATE', 'CUSTOMER', $customer->id, null, ['name' => $customer->full_name]);
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
-                    'success' => true,
-                    'message' => "Customer {$customer->full_name} created successfully.",
+                    'success'  => true,
+                    'message'  => "Customer {$customer->full_name} created successfully.",
                     'redirect' => route('customers.show', $customer->id),
                 ]);
             }
 
             return redirect()->route('customers.show', $customer->id)
-                ->with('success', "Customer {$customer->full_name} created successfully.");
+                ->with('success', "Customer {$customer->full_name} created successfully.")
+                ->with('msgb', "Customer {$customer->full_name} created successfully.");
         });
     }
 
+    // ---------------------- 4. Update Action ---------------------
     /**
      * Update customer profile and address coordinates
      */
@@ -220,16 +237,17 @@ class CustomerController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
+        // Explicit input extraction (Senior Blueprint)
         $customer->update([
-            'full_name' => $validated['full_name'],
-            'phone' => $validated['phone'],
-            'email' => $validated['email'] ?? null,
-            'customer_type' => $validated['customer_type'],
-            'company_name' => $validated['company_name'] ?? null,
-            'gst_number' => $validated['gst_number'] ?? null,
-            'status' => $validated['status'],
+            'full_name'      => $validated['full_name'],
+            'phone'          => $validated['phone'],
+            'email'          => $validated['email'] ?? null,
+            'customer_type'  => $validated['customer_type'],
+            'company_name'   => $validated['company_name'] ?? null,
+            'gst_number'     => $validated['gst_number'] ?? null,
+            'status'         => $validated['status'],
             'customer_label' => $validated['customer_label'] ?? null,
-            'notes' => $validated['notes'] ?? null,
+            'notes'          => $validated['notes'] ?? null,
         ]);
 
         $hasAddressInput = $request->has('address_line1') || $request->has('latitude') || $request->has('longitude') || $request->has('city');
@@ -273,13 +291,16 @@ class CustomerController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Customer profile and destination coordinates updated successfully.',
-                'reload' => true,
+                'reload'  => true,
             ]);
         }
 
-        return back()->with('success', 'Customer profile and destination coordinates updated successfully.');
+        return back()
+            ->with('success', 'Customer profile and destination coordinates updated successfully.')
+            ->with('msgb', 'Customer profile and destination coordinates updated successfully.');
     }
 
+    // ---------------------- 5. Soft Delete / Archive Action ---------------------
     /**
      * Soft-archive / delete customer
      */
@@ -289,7 +310,9 @@ class CustomerController extends Controller
         $customer->update(['archived_at' => now(), 'status' => 'INACTIVE']);
         AuditLog::log('ARCHIVE', 'CUSTOMER', $customer->id);
 
-        return redirect()->route('customers.index')->with('success', "Customer {$customer->full_name} archived.");
+        return redirect()->route('customers.index')
+            ->with('success', "Customer {$customer->full_name} archived.")
+            ->with('msgb', "Customer {$customer->full_name} archived.");
     }
 
     /**
@@ -345,7 +368,9 @@ class CustomerController extends Controller
             ]);
         }
 
-        return back()->with('success', 'New address added successfully.');
+        return back()
+            ->with('success', 'New address added successfully.')
+            ->with('msgb', 'New address added successfully.');
     }
 
     /**
@@ -401,8 +426,12 @@ class CustomerController extends Controller
             ]);
         }
 
-        return back()->with('success', 'Customer address and destination coordinates updated successfully.');
+        return back()
+            ->with('success', 'Customer address and destination coordinates updated successfully.')
+            ->with('msgb', 'Customer address and destination coordinates updated successfully.');
     }
+
+    // ---------------------- 6. Geocoding Telemetry Actions ---------------------
 
     /**
      * Address geocoding helper for search and pinpointing
@@ -865,6 +894,7 @@ class CustomerController extends Controller
         }
     }
 
+    // ---------------------- 7. CSV Data Interchange Actions ---------------------
     /**
      * Export customer records as CSV
      */

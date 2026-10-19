@@ -8,12 +8,15 @@ use Illuminate\Http\Request;
 
 class JobCardController extends Controller
 {
+    /* 1. View / List Details */
     public function index(Request $request)
     {
+        $search = $request->filled('search') ? trim((string) $request->input('search')) : null;
+        $status = $request->filled('status') ? trim((string) $request->input('status')) : null;
+
         $query = JobCard::with(['customer', 'asset.product', 'technician', 'service']);
 
-        if ($request->filled('search')) {
-            $search = trim($request->search);
+        if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('job_card_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {
@@ -23,8 +26,8 @@ class JobCardController extends Controller
             });
         }
 
-        if ($request->filled('status') && $request->status !== 'ALL') {
-            $query->where('status', $request->status);
+        if (!empty($status) && $status !== 'ALL') {
+            $query->where('status', $status);
         }
 
         $jobCards = $query->latest()->paginate(15)->withQueryString();
@@ -32,6 +35,7 @@ class JobCardController extends Controller
         return view('job_cards.index', compact('jobCards'));
     }
 
+    /* 2. View Single / Show Details */
     public function show($id)
     {
         $jobCard = JobCard::with(['customer.addresses', 'asset.product', 'technician', 'service.warranty'])

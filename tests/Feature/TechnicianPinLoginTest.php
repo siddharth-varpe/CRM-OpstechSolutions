@@ -31,7 +31,7 @@ class TechnicianPinLoginTest extends TestCase
     {
         $response = $this->get(route('tech_portal.login'));
         $response->assertStatus(200);
-        $response->assertSee('Field Technician Portal');
+        $response->assertDontSee('Field Technician Portal');
         $response->assertSee('Technician PIN Access');
         $response->assertSee('Security PIN');
         $response->assertSee('Sign In to Technician Portal');

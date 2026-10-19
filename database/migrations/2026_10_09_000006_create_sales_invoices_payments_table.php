@@ -12,7 +12,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('sale_number')->unique(); // SALE-2026-0001
             $table->uuid('customer_id');
-            $table->timestamp('sale_date');
+            $table->dateTime('sale_date');
             $table->string('status')->default('COMPLETED'); // DRAFT, COMPLETED, CANCELLED
             $table->decimal('subtotal', 12, 2);
             $table->decimal('discount_amount', 12, 2)->default(0.00);
@@ -62,8 +62,8 @@ return new class extends Migration
             $table->uuid('sale_id')->nullable();
             $table->uuid('job_card_id')->nullable();
             $table->uuid('service_id')->nullable();
-            $table->timestamp('invoice_date');
-            $table->timestamp('due_date');
+            $table->dateTime('invoice_date');
+            $table->dateTime('due_date');
             $table->decimal('subtotal', 12, 2);
             $table->decimal('discount_amount', 12, 2)->default(0.00);
             $table->decimal('tax_amount', 12, 2)->default(0.00);
@@ -117,7 +117,7 @@ return new class extends Migration
             $table->uuid('customer_id');
             $table->uuid('invoice_id');
             $table->decimal('amount', 12, 2);
-            $table->timestamp('payment_date');
+            $table->dateTime('payment_date');
             $table->string('payment_method')->default('CASH'); // CASH, UPI, CARD, BANK_TRANSFER, CHEQUE, OTHER
             $table->string('status')->default('COMPLETED'); // COMPLETED, PENDING, FAILED, CANCELLED, REFUNDED
             $table->string('reference_number')->nullable();

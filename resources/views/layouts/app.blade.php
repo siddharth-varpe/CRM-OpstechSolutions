@@ -82,21 +82,24 @@
 </head>
 <body class="min-h-screen bg-workspace flex flex-col font-sans relative antialiased select-none print:bg-white print:min-h-0 print:p-0">
 
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 hidden md:hidden transition-opacity"></div>
+
     <!-- Global Authoritative Sidebar -->
-    <aside id="global-sidebar" class="fixed top-0 bottom-0 left-0 h-screen z-40 bg-[#00152B] text-white flex flex-col justify-between py-3.5 select-none print:hidden border-r border-slate-800/80 rounded-r-2xl transition-all duration-200 ease-out shadow-2xl w-[68px] hover:w-[136px] md:hover:w-[136px] group">
+    <aside id="global-sidebar" class="fixed top-0 bottom-0 left-0 h-screen z-40 bg-[#00152B] text-white flex flex-col justify-between py-3.5 select-none print:hidden border-r border-slate-800/80 rounded-r-2xl transition-transform duration-200 ease-out shadow-2xl -translate-x-full md:translate-x-0 w-64 md:w-[68px] md:hover:w-[136px] group">
         <!-- Top Branding Section -->
         <div class="flex flex-col items-center px-2 shrink-0">
             <div class="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center p-1 shadow-md mb-1.5 shrink-0 border border-white/20">
                 <img src="{{ asset('assets/crm-logo.png') }}" alt="Enterprises CRM Logo" class="w-full h-full object-contain drop-shadow">
             </div>
-            <div class="text-center px-1 overflow-hidden w-full hidden group-hover:block transition-all">
+            <div class="text-center px-1 overflow-hidden w-full block md:hidden md:group-hover:block transition-all">
                 <span class="block text-[10px] font-display font-extrabold tracking-wider text-white uppercase truncate">ENTERPRISES</span>
-                <span class="block text-[8px] font-bold text-sky-400 tracking-widest uppercase font-mono">CRM</span>
+                <span class="block text-[8px] font-bold text-sky-400 tracking-widest uppercase font-mono">CRM v{{ config('app.version', '1.0.0') }}</span>
             </div>
         </div>
 
         <!-- Navigation Items Container -->
-        <nav class="flex-1 overflow-y-auto overflow-x-hidden my-3 px-2 space-y-1.5 scrollbar-none flex flex-col items-center group-hover:items-stretch">
+        <nav class="flex-1 overflow-y-auto overflow-x-hidden my-3 px-2 space-y-1.5 scrollbar-none flex flex-col items-stretch md:items-center md:group-hover:items-stretch">
             @php
                 $currentRoute = Route::currentRouteName() ?? '';
                 $navItems = [
@@ -123,7 +126,7 @@
                    class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 {{ $isActive ? 'bg-primary-600 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-white/10' }}"
                    title="{{ $item['label'] }}">
                     <i data-lucide="{{ $item['icon'] }}" class="w-5 h-5 shrink-0"></i>
-                    <span class="truncate hidden group-hover:inline">{{ $item['label'] }}</span>
+                    <span class="truncate inline md:hidden md:group-hover:inline">{{ $item['label'] }}</span>
                 </a>
             @endforeach
         </nav>
@@ -134,7 +137,7 @@
                class="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
                title="Technician Portal">
                 <i data-lucide="smartphone" class="w-5 h-5 shrink-0 text-sky-400"></i>
-                <span class="truncate hidden group-hover:inline">Tech Portal</span>
+                <span class="truncate inline md:hidden md:group-hover:inline">Tech Portal</span>
             </a>
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
@@ -142,16 +145,16 @@
                         class="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left"
                         title="Sign Out">
                     <i data-lucide="log-out" class="w-5 h-5 shrink-0"></i>
-                    <span class="truncate hidden group-hover:inline">Logout</span>
+                    <span class="truncate inline md:hidden md:group-hover:inline">Logout</span>
                 </button>
             </form>
         </div>
     </aside>
 
     <!-- Main Application Shell -->
-    <div class="flex-1 flex flex-col pl-[68px] transition-all duration-200 ease-out print:pl-0">
+    <div class="flex-1 flex flex-col pl-0 md:pl-[68px] transition-all duration-200 ease-out print:pl-0 min-w-0">
         <!-- Persistent Topbar Header -->
-        <header class="h-16 bg-white border-b border-slate-200/90 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs print:hidden">
+        <header class="h-16 bg-white border-b border-slate-200/90 px-3 sm:px-4 lg:px-6 flex items-center justify-between sticky top-0 z-20 shadow-2xs print:hidden">
             <div class="flex items-center gap-3">
                 <button type="button" id="mobile-menu-toggle" class="md:hidden p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 focus:outline-none">
                     <i data-lucide="menu" class="w-5 h-5"></i>
@@ -188,7 +191,7 @@
                         @endif
                     </button>
                     <!-- Notification Dropdown Panel -->
-                    <div id="notifications-dropdown" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-dropdown border border-slate-200 z-50 overflow-hidden">
+                    <div id="notifications-dropdown" class="hidden absolute right-0 mt-2 w-72 sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-dropdown border border-slate-200 z-50 overflow-hidden">
                         <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <span class="font-bold text-xs text-slate-800 uppercase tracking-wider">Notifications ({{ $unreadCount }})</span>
                             <span class="text-xs text-primary-600 hover:underline cursor-pointer" id="mark-all-read-btn">Mark all read</span>
@@ -214,26 +217,23 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- User Profile Badge -->
-                @auth
-                <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-                    <div class="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
-                        {{ strtoupper(substr(auth()->user()->display_name, 0, 1)) }}
-                    </div>
-                    <div class="hidden sm:flex flex-col">
-                        <span class="text-xs font-bold text-slate-800 leading-tight">{{ auth()->user()->display_name }}</span>
-                        <span class="text-[10px] text-slate-500 font-semibold">{{ auth()->user()->role }}</span>
-                    </div>
-                </div>
-                @endauth
             </div>
         </header>
 
         <!-- Main Viewport Body -->
-        <main class="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <main class="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto min-w-0">
             @yield('content')
         </main>
+
+        <!-- Global CRM Footer -->
+        <footer class="mt-auto py-3.5 px-3 sm:px-4 lg:px-6 text-xs text-slate-500 border-t border-slate-200/90 bg-white/70 backdrop-blur-xs print:hidden flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <span>&copy; {{ date('Y') }} {{ \App\Models\SystemSetting::get('company_name', 'Enterprises CRM') }}. All rights reserved.</span>
+            </div>
+            <div class="flex items-center gap-2 font-mono text-[11px] text-slate-500">
+                <span>v{{ config('app.version', '1.0.0') }}</span>
+            </div>
+        </footer>
     </div>
 
     <!-- Global Search Modal (Command Palette) -->
@@ -253,11 +253,25 @@
     </div>
 
     <!-- Universal Toasts Container -->
-    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+    <div id="toast-container" class="fixed bottom-5 right-3 sm:right-5 z-50 flex flex-col gap-2 max-w-[calc(100vw-1.5rem)] sm:max-w-sm w-full pointer-events-none"></div>
 
     <script>
     $(document).ready(function() {
         if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Mobile Sidebar Drawer Toggle
+        $('#mobile-menu-toggle').on('click', function(e) {
+            e.stopPropagation();
+            $('#global-sidebar').toggleClass('-translate-x-full');
+            $('#sidebar-backdrop').toggleClass('hidden');
+        });
+
+        $('#sidebar-backdrop, #global-sidebar a').on('click', function() {
+            if ($(window).width() < 768) {
+                $('#global-sidebar').addClass('-translate-x-full');
+                $('#sidebar-backdrop').addClass('hidden');
+            }
+        });
 
         // Notification dropdown toggle
         $('#notifications-toggle').on('click', function(e) {
@@ -322,6 +336,27 @@
         });
     });
     </script>
+
+    {{-- Senior Standard & Reliable Session Flash Feedback Handler --}}
+    @if(session()->has('msgb') || session()->has('success'))
+    <script>
+        $(document).ready(function() {
+            if (window.showToast) {
+                window.showToast(@json(session('msgb') ?? session('success')), 'success');
+            }
+        });
+    </script>
+    @endif
+    @if(session()->has('failmsg') || session()->has('error'))
+    <script>
+        $(document).ready(function() {
+            if (window.showToast) {
+                window.showToast(@json(session('failmsg') ?? session('error')), 'danger');
+            }
+        });
+    </script>
+    @endif
+
     @stack('scripts')
 </body>
 </html>

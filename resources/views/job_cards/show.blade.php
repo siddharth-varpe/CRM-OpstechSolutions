@@ -124,12 +124,31 @@
                 </p>
             </div>
 
-            @if($jobCard->parts_replaced)
+            @if(!empty($jobCard->formatted_parts))
                 <div>
-                    <span class="font-bold text-slate-500 uppercase tracking-wider block mb-1">Spare Parts Installed:</span>
-                    <p class="text-slate-900 bg-slate-50 p-3 rounded-lg border border-slate-200/80 font-mono">
-                        {{ is_array($jobCard->parts_replaced) ? implode(', ', $jobCard->parts_replaced) : $jobCard->parts_replaced }}
-                    </p>
+                    <span class="font-bold text-slate-500 uppercase tracking-wider block mb-1">Spare Parts Installed &amp; Replaced:</span>
+                    <div class="border border-slate-200 rounded-lg overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 uppercase font-semibold">
+                                <tr>
+                                    <th class="p-2">Part Description</th>
+                                    <th class="p-2 text-center">Qty</th>
+                                    <th class="p-2 text-right">Unit Price</th>
+                                    <th class="p-2 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 font-mono">
+                                @foreach($jobCard->formatted_parts as $part)
+                                    <tr>
+                                        <td class="p-2 font-sans font-medium text-slate-800">{{ $part['name'] }}</td>
+                                        <td class="p-2 text-center">{{ $part['quantity'] }}</td>
+                                        <td class="p-2 text-right">₹{{ number_format($part['price'], 2) }}</td>
+                                        <td class="p-2 text-right font-bold text-slate-900">₹{{ number_format($part['total'], 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             @endif
         </div>

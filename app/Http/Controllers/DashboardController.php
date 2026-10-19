@@ -121,18 +121,14 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * Show Dashboard View
-     */
+    /* 1. View / List Details */
     public function index()
     {
         $data = self::getMetrics();
         return view('dashboard.index', $data);
     }
 
-    /**
-     * AJAX endpoint for live dashboard data polling
-     */
+    /* 1. AJAX Live Telemetry Overview */
     public function overview()
     {
         $metrics = self::getMetrics();

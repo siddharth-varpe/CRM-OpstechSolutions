@@ -3,7 +3,7 @@
 @section('title', 'System Settings & Audit - Enterprises CRM')
 
 @section('content')
-<div class="space-y-6 max-w-[1600px] mx-auto pb-12 select-none">
+<div class="space-y-6 max-w-5xl mx-auto pb-12 select-none w-full">
     <!-- 1. Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3.5">
@@ -11,7 +11,10 @@
                 <i data-lucide="settings" class="w-6 h-6"></i>
             </div>
             <div>
-                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">System Settings &amp; Configuration</h1>
+                <div class="flex items-center gap-2.5">
+                    <h1 class="text-2xl font-bold text-slate-900 tracking-tight">System Settings &amp; Configuration</h1>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold font-mono bg-sky-50 text-sky-700 border border-sky-200">v{{ config('app.version', '1.0.0') }}</span>
+                </div>
                 <p class="text-xs sm:text-sm text-slate-500 font-normal">
                     Manage business metadata, GST defaults, document sequences and audit trail
                 </p>
@@ -52,7 +55,7 @@
 
     <!-- 3. Tab Contents -->
     @if($tab === 'business')
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 max-w-4xl">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 w-full">
             <h3 class="font-bold text-slate-900 text-base mb-1">Company Profile &amp; Banking Details</h3>
             <p class="text-xs text-slate-500 mb-6">These details appear automatically on all official GST tax invoices, job cards and receipts.</p>
 
@@ -124,7 +127,7 @@
             </form>
         </div>
     @elseif($tab === 'numbering')
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 max-w-4xl space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 w-full space-y-6">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                     <h3 class="font-bold text-slate-900 text-base mb-1">Document Sequences &amp; Numbering Rules</h3>
@@ -190,7 +193,7 @@
             </form>
         </div>
     @elseif($tab === 'tax')
-        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 max-w-4xl space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 w-full space-y-6">
             <div>
                 <h3 class="font-bold text-slate-900 text-base mb-1">GST, Invoicing &amp; Operational Policies</h3>
                 <p class="text-xs text-slate-500">Default taxation rates, billing terms and service operation parameters.</p>
@@ -312,7 +315,7 @@
     @endif
 
     @if($tab === 'data')
-        <div class="space-y-6 max-w-4xl">
+        <div class="space-y-6 w-full">
             <!-- Data Management Section Card -->
             <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6">
                 <div class="flex items-start gap-4">
